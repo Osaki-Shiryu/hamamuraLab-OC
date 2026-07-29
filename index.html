@@ -696,7 +696,7 @@
         2台のスマホで「送信」「受信」役を分けて試してみましょう。
       </div>
       <div class="notice">
-        <b>使うトーン：</b> 同期音(プリアンブル) 1000Hz／ビット0 = 1400Hz／ビット1 = 1800Hz。
+        <b>使うトーン：</b> 同期音(プリアンブル) 1800Hz／ビット0 = 2400Hz／ビット1 = 3000Hz。
         1ビットあたり250ms。周囲が静かな場所・スマホの音量を上げた状態で試してください。
       </div>
 
@@ -2336,28 +2336,46 @@
   }
 
   // ============ 音声モデム（FSKで実際にビットを送受信する） ============
-  const MODEM_PREAMBLE_FREQ = 1000;
-  const MODEM_BIT0_FREQ = 1400;
-  const MODEM_BIT1_FREQ = 1800;
+  const MODEM_PREAMBLE_FREQ = 1800;
+  const MODEM_BIT0_FREQ = 2400;
+  const MODEM_BIT1_FREQ = 3000;
   const MODEM_BIT_MS = 250;
   const MODEM_PREAMBLE_MS = 300;
   const MODEM_BITS = 8;
   const MODEM_DETECT_THRESHOLD = 90; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
 
-  function playModemTone(freq, startTime, durationSec, gainLevel){
+  // 1つの発振器の周波数を時間に沿って切り替えてFSK送信する。
+  // トーンごとに別々のオシレーター/ゲインノードを作って管理すると、後半のノードの
+  // 開始・終了タイミングがズレて音が途切れることがあったため、単一ノードに統一した。
+  function sendModemFSK(bits){
     const ctx = getAudioCtx();
+    const startDelay = 0.08;
+    const t0 = ctx.currentTime + startDelay;
+    const gainLevel = 0.7;
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(gainLevel, startTime + 0.01);
-    gain.gain.setValueAtTime(gainLevel, Math.max(startTime + 0.01, startTime + durationSec - 0.015));
-    gain.gain.linearRampToValueAtTime(0, startTime + durationSec);
     osc.connect(gain).connect(ctx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + durationSec + 0.03);
-    setTimeout(() => { try{ osc.disconnect(); gain.disconnect(); }catch(e){} }, (durationSec+0.1)*1000 + 200);
+
+    osc.frequency.setValueAtTime(MODEM_PREAMBLE_FREQ, t0);
+    let t = t0 + MODEM_PREAMBLE_MS/1000;
+    bits.forEach(b => {
+      osc.frequency.setValueAtTime(b ? MODEM_BIT1_FREQ : MODEM_BIT0_FREQ, t);
+      t += MODEM_BIT_MS/1000;
+    });
+    const tEnd = t;
+
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(gainLevel, t0 + 0.02);
+    gain.gain.setValueAtTime(gainLevel, tEnd - 0.03);
+    gain.gain.linearRampToValueAtTime(0, tEnd);
+
+    osc.start(t0);
+    osc.stop(tEnd + 0.05);
+    osc.onended = () => { try{ osc.disconnect(); gain.disconnect(); }catch(e){} };
+
+    return t0;
   }
 
   const modemValueSlider = document.getElementById('modemValueSlider');
@@ -2390,14 +2408,8 @@
     const bits = valueToBits(value);
     const ctx = getAudioCtx();
     const startDelay = 0.08;
-    let t = ctx.currentTime + startDelay;
 
-    playModemTone(MODEM_PREAMBLE_FREQ, t, MODEM_PREAMBLE_MS/1000, 0.5);
-    t += MODEM_PREAMBLE_MS/1000;
-    bits.forEach(b => {
-      playModemTone(b ? MODEM_BIT1_FREQ : MODEM_BIT0_FREQ, t, MODEM_BIT_MS/1000, 0.5);
-      t += MODEM_BIT_MS/1000;
-    });
+    sendModemFSK(bits);
 
     // UI上でもビットが光るタイミングを、実際の再生タイミングに合わせて表示する
     const bitEls = modemTxBits.querySelectorAll('.modem-bit');
