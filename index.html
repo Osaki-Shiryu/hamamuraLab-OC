@@ -253,6 +253,20 @@
   }
   .pitch-breakdown .row b{ color:var(--sig-teal); font-family:var(--font-display); }
 
+  /* ============ タブ切り替え（音／通信） ============ */
+  .tab-bar{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab-btn{
+    flex:1; text-align:center; padding:12px 8px; border-radius:12px; cursor:pointer;
+    background:var(--bg-panel); border:1px solid var(--line-dim); color:var(--text-dim);
+    font-weight:700; font-size:14px; transition:border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .tab-btn.active{ border-color:var(--sig-teal); color:var(--sig-teal); background:#0f261f; }
+  .comm-card{
+    padding:20px; border-radius:14px; text-align:center; border:1px dashed var(--line-dim);
+    background:var(--bg-panel); color:var(--text-dim); margin-top:16px; line-height:1.8; font-size:13px;
+  }
+  .comm-card .big{ font-size:34px; margin-bottom:10px; }
+
   .log{ margin-top:16px; font-family:var(--font-display); font-size:11px; color:var(--text-dim); max-height:110px; overflow-y:auto; line-height:1.8; }
   .log div span{ color:var(--sig-teal); }
 
@@ -295,6 +309,13 @@
     <h1>浜村研究室</h1>
     <div class="sub">ディジタル無線通信の学習・オープンキャンパス体験用コンテンツです。アプリ不要、iOS・Android共通。</div>
   </header>
+
+  <div class="tab-bar">
+    <div class="tab-btn active" id="tabSound">🔊 音</div>
+    <div class="tab-btn" id="tabComm">📡 通信</div>
+  </div>
+
+  <div id="worldSound">
 
   <div class="panel">
     <div class="notice">
@@ -523,6 +544,13 @@
         その音の高さで「あー」と声を伸ばして歌ってください → ③自動採点されます。
         音域が合わなくてオクターブ違いで歌っても、大きくは減点しません。
       </div>
+
+      <div class="chan-title">声の高さの範囲を選ぶ</div>
+      <div class="chan-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="chan-btn selected" id="genderFemaleBtn">女性（A3〜A5）</div>
+        <div class="chan-btn" id="genderMaleBtn">男性（C3〜C5）</div>
+      </div>
+
       <button class="act btn-seek" id="pitchStartBtn">スタート</button>
       <button class="act btn-back" id="pitchIntroBack">メインメニューに戻る</button>
     </div>
@@ -572,6 +600,19 @@
   </div>
 
   <div class="log" id="log"></div>
+
+  </div><!-- /worldSound -->
+
+  <div id="worldComm" class="hidden">
+    <div class="comm-card">
+      <div class="big">📡</div>
+      <b>通信シミュレーション（準備中）</b><br><br>
+      ここに、ディジタル無線通信の考え方を体験できるシミュレーションを追加していく予定です。<br>
+      候補：変調方式の聞き比べ、誤り訂正符号（ハミング符号）パズル、周波数分割多元接続（FDMA）の陣取りゲーム、
+      シャノン限界を体感するチャレンジ　など。<br><br>
+      どれから作るか、一緒に決めましょう。
+    </div>
+  </div>
 
   <footer>Web Audio API (OscillatorNode / AnalyserNode) を使用。Bluetoothは使用していません。</footer>
 </div>
@@ -649,6 +690,36 @@
     [roleSelect, hostPanel, modeSelect, orderPanel, simulPanel, radarPanel, dirScanPanel, pitchPanel].forEach(p => p.classList.add('hidden'));
     panel.classList.remove('hidden');
   }
+
+  // ============ タブ切り替え（音／通信） ============
+  const tabSound = document.getElementById('tabSound');
+  const tabComm = document.getElementById('tabComm');
+  const worldSound = document.getElementById('worldSound');
+  const worldComm = document.getElementById('worldComm');
+
+  function stopAllSoundAudio(){
+    stopOscillator();
+    stopReceivingOrder();
+    stopReceivingSimul();
+    stopRadar();
+    stopDirScan();
+    stopPitchMic();
+  }
+
+  tabSound.addEventListener('click', () => {
+    tabSound.classList.add('active');
+    tabComm.classList.remove('active');
+    worldSound.classList.remove('hidden');
+    worldComm.classList.add('hidden');
+  });
+  tabComm.addEventListener('click', () => {
+    tabComm.classList.add('active');
+    tabSound.classList.remove('active');
+    worldComm.classList.remove('hidden');
+    worldSound.classList.add('hidden');
+    stopAllSoundAudio();
+    showPanel(roleSelect); // 次に「音」タブに戻ったときメインメニューから始まるようにする
+  });
 
   pickHost.addEventListener('click', () => showPanel(hostPanel));
   pickSeek.addEventListener('click', () => showPanel(modeSelect));
@@ -1555,20 +1626,46 @@
   // ============ 音程チャレンジ ============
   const NOTE_NAMES_JP = { C:'ド', D:'レ', E:'ミ', F:'ファ', G:'ソ', A:'ラ', B:'シ' };
   const SEMITONE_FROM_C = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
-  const NOTE_SEQUENCE = [
+
+  function buildNotePool(sequence){
+    return sequence.map(n => {
+      const offset = 12*(n.octave-4) + SEMITONE_FROM_C[n.letter] - 9; // A4を基準(0)とした半音数
+      const freq = 440 * Math.pow(2, offset/12);
+      return { name:n.letter+n.octave, jp:NOTE_NAMES_JP[n.letter], freq };
+    });
+  }
+
+  // 女性向け：A3(220Hz)〜A5(880Hz)
+  const NOTE_POOL_FEMALE = buildNotePool([
     {letter:'A',octave:3},{letter:'B',octave:3},
     {letter:'C',octave:4},{letter:'D',octave:4},{letter:'E',octave:4},{letter:'F',octave:4},{letter:'G',octave:4},{letter:'A',octave:4},{letter:'B',octave:4},
     {letter:'C',octave:5},{letter:'D',octave:5},{letter:'E',octave:5},{letter:'F',octave:5},{letter:'G',octave:5},{letter:'A',octave:5},
-  ];
-  const NOTE_POOL = NOTE_SEQUENCE.map(n => {
-    const offset = 12*(n.octave-4) + SEMITONE_FROM_C[n.letter] - 9; // A4を基準(0)とした半音数
-    const freq = 440 * Math.pow(2, offset/12);
-    return { name:n.letter+n.octave, jp:NOTE_NAMES_JP[n.letter], freq };
-  });
+  ]);
+  // 男性向け：C3(131Hz)〜C5(523Hz)。無理なく出せる上限をおよそ500Hz付近までに設定
+  const NOTE_POOL_MALE = buildNotePool([
+    {letter:'C',octave:3},{letter:'D',octave:3},{letter:'E',octave:3},{letter:'F',octave:3},{letter:'G',octave:3},{letter:'A',octave:3},{letter:'B',octave:3},
+    {letter:'C',octave:4},{letter:'D',octave:4},{letter:'E',octave:4},{letter:'F',octave:4},{letter:'G',octave:4},{letter:'A',octave:4},{letter:'B',octave:4},
+    {letter:'C',octave:5},
+  ]);
 
   const PITCH_QUESTIONS_TOTAL = 5;
   const PITCH_RECORD_MS = 1500;
   const PITCH_MIN_HZ = 70, PITCH_MAX_HZ = 1300; // 自己相関の結果として妥当とみなす範囲
+
+  let pitchGender = 'female'; // 'female' | 'male'
+
+  const genderFemaleBtn = document.getElementById('genderFemaleBtn');
+  const genderMaleBtn = document.getElementById('genderMaleBtn');
+  genderFemaleBtn.addEventListener('click', () => {
+    pitchGender = 'female';
+    genderFemaleBtn.classList.add('selected');
+    genderMaleBtn.classList.remove('selected');
+  });
+  genderMaleBtn.addEventListener('click', () => {
+    pitchGender = 'male';
+    genderMaleBtn.classList.add('selected');
+    genderFemaleBtn.classList.remove('selected');
+  });
 
   const pitchIntro = document.getElementById('pitchIntro');
   const pitchQuestion = document.getElementById('pitchQuestion');
@@ -1600,7 +1697,8 @@
   let pitchIntervalId = null;
 
   function pickPitchQuestions(){
-    const pool = NOTE_POOL.slice();
+    const sourcePool = pitchGender === 'male' ? NOTE_POOL_MALE : NOTE_POOL_FEMALE;
+    const pool = sourcePool.slice();
     for(let i=pool.length-1; i>0; i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
     return pool.slice(0, PITCH_QUESTIONS_TOTAL);
   }
@@ -1649,6 +1747,14 @@
   playExampleBtn.addEventListener('click', () => {
     const note = pitchQueue[pitchIndex];
     const ctx = getAudioCtx();
+
+    // 人の耳は同じ音量(振幅)でも周波数によって聞こえ方の大きさが違う（等ラウドネス曲線）。
+    // さらに、スマホの小さいスピーカーは低音の再生がそもそも苦手なので、
+    // 440Hzを基準に低い音ほど大きく補正する。
+    const compensation = Math.pow(440 / note.freq, 0.6);
+    const targetGain = Math.min(1.3, Math.max(0.4, 0.6 * compensation));
+
+    // 基音（本来の高さ）のオシレーター
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -1656,16 +1762,32 @@
     gain.gain.value = 0;
     osc.connect(gain).connect(ctx.destination);
     osc.start();
-
-    // 人の耳は同じ音量(振幅)でも周波数によって聞こえ方の大きさが違う（等ラウドネス曲線）。
-    // 440Hzを基準に、低い音は少し大きく・高い音は少し控えめに補正して聞こえ方を揃える。
-    const compensation = Math.pow(440 / note.freq, 0.5);
-    const targetGain = Math.min(0.9, Math.max(0.35, 0.6 * compensation));
-
     gain.gain.linearRampToValueAtTime(targetGain, ctx.currentTime + 0.05);
     gain.gain.setValueAtTime(targetGain, ctx.currentTime + 1.3);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.6);
-    setTimeout(() => { try{ osc.stop(); osc.disconnect(); gain.disconnect(); }catch(e){} }, 1700);
+
+    const nodesToStop = [{osc, gain}];
+
+    // 低い音（およそ260Hz未満）は、スピーカーが再生しやすい1オクターブ上の倍音を
+    // 控えめに重ねることで、音の高さの印象を保ったまま聞き取りやすくする。
+    if(note.freq < 260){
+      const oscHarm = ctx.createOscillator();
+      const gainHarm = ctx.createGain();
+      oscHarm.type = 'sine';
+      oscHarm.frequency.value = note.freq * 2;
+      gainHarm.gain.value = 0;
+      oscHarm.connect(gainHarm).connect(ctx.destination);
+      oscHarm.start();
+      const harmGain = targetGain * 0.5;
+      gainHarm.gain.linearRampToValueAtTime(harmGain, ctx.currentTime + 0.05);
+      gainHarm.gain.setValueAtTime(harmGain, ctx.currentTime + 1.3);
+      gainHarm.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.6);
+      nodesToStop.push({osc:oscHarm, gain:gainHarm});
+    }
+
+    setTimeout(() => {
+      nodesToStop.forEach(n => { try{ n.osc.stop(); n.osc.disconnect(); n.gain.disconnect(); }catch(e){} });
+    }, 1700);
   });
 
   // 自己相関法によるピッチ検出（時間波形から基本周波数を推定する）
