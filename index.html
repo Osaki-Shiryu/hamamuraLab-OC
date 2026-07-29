@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>浜村研究室</title>
+<style>
+  :root{
+    --bg-deep:#07130f;
+    --bg-panel:#0d1f19;
+    --line-dim:#1c3a30;
+    --sig-teal:#4fe8c8;
+    --sig-green:#5bffa8;
+    --sig-amber:#ffb454;
+    --sig-red:#ff5d6c;
+    --sig-blue:#5aa9ff;
+    --gold:#ffd76b;
+    --gold-deep:#c98f1c;
+    --text-main:#e6fff6;
+    --text-dim:#5f9484;
+    --font-display:'Space Mono', 'Courier New', monospace;
+    --font-body:'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{ background:var(--bg-deep); color:var(--text-main); font-family:var(--font-body); min-height:100vh; }
+  body{ background-image:radial-gradient(circle at 50% 0%, #123328 0%, var(--bg-deep) 62%); }
+  .wrap{ max-width:520px; margin:0 auto; padding:18px 16px 60px; }
+
+  header{ text-align:center; margin-bottom:14px; }
+  .eyebrow{ font-family:var(--font-display); font-size:11px; letter-spacing:.2em; color:var(--sig-teal); opacity:.85; }
+  h1{ font-size:24px; font-weight:700; margin-top:6px; }
+  .sub{ color:var(--text-dim); font-size:13px; margin-top:6px; line-height:1.6; }
+
+  .panel{ background:linear-gradient(180deg, var(--bg-panel), #081512); border:1px solid var(--line-dim); border-radius:14px; padding:16px; margin-top:16px; }
+
+  .notice{ font-size:12px; color:var(--text-dim); line-height:1.7; background:#0a1a15; border:1px solid var(--line-dim); border-radius:10px; padding:12px; }
+  .notice b{ color:var(--sig-amber); }
+
+  .role-grid{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+  .mode-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+  .role-grid .role-card{ display:flex; align-items:center; gap:14px; text-align:left; padding:16px; }
+  .role-grid .role-card .big{ font-size:28px; margin-bottom:0; flex-shrink:0; }
+  .role-card{
+    padding:22px 10px; border-radius:14px; text-align:center; cursor:pointer;
+    border:1px solid var(--line-dim); background:var(--bg-panel);
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  .role-card:active{ transform:scale(.97); }
+  .role-card .big{ font-size:30px; margin-bottom:8px; }
+  .role-card .ttl{ font-weight:700; font-size:14px; }
+  .role-card .desc{ font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.5; }
+  .role-card.host:hover, .role-card.host.active{ border-color:var(--sig-amber); }
+  .role-card.seek:hover, .role-card.seek.active{ border-color:var(--sig-teal); }
+  .role-card.simul:hover{ border-color:var(--sig-blue); }
+  .role-card.order:hover{ border-color:var(--sig-teal); }
+
+  .hidden{ display:none !important; }
+
+  button.act{
+    font-family:var(--font-body); font-weight:700; font-size:15px; border:none; border-radius:12px;
+    padding:15px 18px; cursor:pointer; width:100%; margin-top:12px;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  button.act:active{ transform:scale(.97); }
+  .btn-host{ background:linear-gradient(135deg, var(--sig-amber), #c77f2f); color:#1a1004; }
+  .btn-seek{ background:linear-gradient(135deg, var(--sig-teal), #2f9f8c); color:#04140f; }
+  .btn-off{ background:transparent; color:var(--sig-red); border:1px solid rgba(255,93,108,.4); }
+  .btn-back{ background:transparent; color:var(--text-dim); border:1px solid var(--line-dim); font-size:12px; padding:8px; margin-top:16px; }
+
+  .chan-title{ font-size:12px; color:var(--text-dim); margin:14px 0 8px; }
+  .chan-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .chan-btn{ padding:12px 4px; border-radius:10px; background:#0a1a15; border:1px solid var(--line-dim); color:var(--text-dim); font-family:var(--font-display); font-size:12px; text-align:center; cursor:pointer; }
+  .chan-btn.selected{ border-color:var(--sig-amber); color:var(--sig-amber); background:#241708; }
+
+  .status-row{ display:flex; align-items:center; gap:8px; margin:14px 0 4px; justify-content:center; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--text-dim); }
+  .dot.on{ background:var(--sig-green); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(91,255,168,.55);} 70%{box-shadow:0 0 0 10px rgba(91,255,168,0);} 100%{box-shadow:0 0 0 0 rgba(91,255,168,0);} }
+  .status-text{ font-family:var(--font-display); font-size:13px; color:var(--text-dim); }
+
+  /* 順番モード：温度計ゲージ */
+  .gauge-wrap{ display:flex; flex-direction:column; align-items:center; margin-top:18px; }
+  .gauge-track{ width:56px; height:190px; border-radius:28px; background:#0a1a15; border:2px solid var(--line-dim); position:relative; overflow:hidden; }
+  .gauge-fill{ position:absolute; bottom:0; left:0; width:100%; height:6%; background:linear-gradient(180deg, var(--sig-red), var(--sig-amber) 40%, var(--sig-teal) 75%, var(--sig-blue)); transition:height .18s ease; }
+  .gauge-percent{ margin-top:12px; font-family:var(--font-display); font-size:32px; font-weight:800; color:var(--text-main); }
+  .gauge-label{ margin-top:2px; font-size:15px; font-weight:700; text-align:center; min-height:22px; transition:color .2s ease; }
+  .gauge-hint{ margin-top:4px; font-size:11.5px; color:var(--text-dim); text-align:center; }
+  .hold-bar-track{ width:100%; height:12px; background:#0a1a15; border-radius:6px; margin-top:12px; overflow:hidden; border:1px solid var(--line-dim); }
+  .hold-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--sig-teal), var(--sig-green)); transition:width .1s linear; }
+  .hold-hint{ margin-top:6px; font-size:12.5px; color:var(--text-dim); text-align:center; font-weight:700; }
+
+  /* 同時モード：バー一覧 */
+  .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .bar-label{ width:44px; font-family:var(--font-display); font-size:12px; color:var(--text-dim); flex-shrink:0; }
+  .bar-track{ flex:1; height:18px; background:#0a1a15; border-radius:9px; overflow:hidden; border:1px solid var(--line-dim); }
+  .bar-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--sig-teal), var(--sig-green)); transition:width .15s ease; }
+  .bar-row.active .bar-fill{ box-shadow:0 0 8px 1px rgba(91,255,168,.6); }
+  .simul-count{ text-align:center; margin-top:14px; }
+  .simul-count .num{ font-family:var(--font-display); font-size:36px; font-weight:700; color:var(--sig-teal); }
+  .simul-count .lbl{ font-size:12px; color:var(--text-dim); }
+
+  /* 図鑑グリッド */
+  .zukan-title{ font-size:13px; font-weight:700; margin:18px 0 10px; display:flex; align-items:center; justify-content:space-between; }
+  .zukan-title .count{ font-family:var(--font-display); color:var(--sig-teal); font-weight:400; font-size:12px; }
+  .zukan{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .cell{ aspect-ratio:1/1; border-radius:12px; background:var(--bg-panel); border:1px solid var(--line-dim); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; opacity:.35; transition:opacity .3s ease, transform .3s ease, border-color .3s ease; }
+  .cell.got{ opacity:1; border-color:var(--sig-green); transform:scale(1.02); background:#0f261f; }
+  .cell .num{ font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--text-dim); }
+  .cell.got .num{ color:var(--sig-green); }
+  .cell .time{ font-size:9px; color:var(--text-dim); margin-top:2px; }
+
+  /* 実績（同時モードの3段階マイルストーン） */
+  .ach-list{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+  .ach-row{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:var(--bg-panel); border:1px solid var(--line-dim); opacity:.55; }
+  .ach-row.unlocked{ opacity:1; border-color:var(--gold); background:linear-gradient(135deg, #241a08, #0d1f19); }
+  .ach-icon{ font-size:20px; width:26px; text-align:center; }
+  .ach-text .t{ font-weight:700; font-size:13px; }
+  .ach-text .d{ font-size:11px; color:var(--text-dim); }
+
+  .complete-banner{ margin-top:18px; padding:20px; border-radius:14px; text-align:center; background:linear-gradient(135deg, rgba(91,255,168,.18), rgba(79,232,200,.08)); border:1px solid var(--sig-green); }
+  .complete-banner .big{ font-size:24px; font-weight:800; color:var(--sig-green); }
+  .complete-banner .welcome-msg{ font-size:19px; font-weight:800; color:var(--gold); margin-top:10px; letter-spacing:.02em; }
+  .complete-banner .time{ font-family:var(--font-display); font-size:14px; color:var(--text-main); margin-top:6px; }
+
+  /* ============ レーダー画面 ============ */
+  .radar-frame{
+    position:relative; width:100%; aspect-ratio:1/1; margin-top:18px; border-radius:50%;
+    background:radial-gradient(circle at 50% 50%, #0e2820 0%, #071410 70%, #050d0a 100%);
+    border:1px solid var(--line-dim); overflow:hidden;
+  }
+  .radar-ring{ position:absolute; border:1px solid rgba(79,232,200,.14); border-radius:50%; top:50%; left:50%; transform:translate(-50%,-50%); }
+  .radar-r1{ width:22%; height:22%; } .radar-r2{ width:44%; height:44%; }
+  .radar-r3{ width:66%; height:66%; } .radar-r4{ width:88%; height:88%; }
+  /* ソナー風に中心から広がって消えるパルスリング。判定と完全に同期させるため、幅・不透明度はJSで直接制御する（CSSアニメーションは使わない） */
+  .radar-pulse{
+    position:absolute; top:50%; left:50%; border-radius:50%;
+    border:2px solid rgba(79,232,200,.4); transform:translate(-50%,-50%);
+    width:0%; height:0%; opacity:0;
+  }
+  .radar-me{
+    position:absolute; top:50%; left:50%; width:12px; height:12px; margin:-6px;
+    background:var(--sig-teal); border-radius:50%; box-shadow:0 0 12px 4px rgba(79,232,200,.55); z-index:5;
+  }
+  .blip-wrap{ position:absolute; width:0; height:0; z-index:6; }
+  .blip-dot{
+    position:absolute; width:13px; height:13px; margin:-6.5px; border-radius:50%;
+    background:var(--text-dim); opacity:1; box-shadow:none;
+    transition:background 2.2s ease, box-shadow 2.2s ease;
+  }
+  .blip-dot.ping{
+    background:var(--sig-green); box-shadow:0 0 14px 5px rgba(91,255,168,.75);
+    transition:background .05s ease, box-shadow .05s ease;
+  }
+  .blip-label{
+    position:absolute; top:15px; left:50%; transform:translateX(-50%);
+    font-family:var(--font-display); font-size:9.5px; color:var(--text-dim);
+    white-space:nowrap; transition:color 2.2s ease;
+  }
+  .blip-label.ping{ color:var(--sig-green); font-weight:700; transition:color .05s ease; }
+
+  .radar-legend{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:14px; }
+  .legend-item{
+    display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:10.5px;
+    color:var(--text-dim); background:var(--bg-panel); border:1px solid var(--line-dim); border-radius:8px;
+    padding:6px 8px; transition:border-color .15s ease, color .15s ease;
+  }
+  .legend-item.active{ border-color:var(--sig-green); color:var(--sig-green); font-weight:700; }
+
+  .radar-detect-list{ margin-top:14px; display:flex; flex-wrap:wrap; gap:6px; min-height:28px; }
+  .detect-chip{
+    font-family:var(--font-display); font-size:11px; color:var(--sig-green);
+    background:#0f261f; border:1px solid var(--sig-green); border-radius:999px; padding:4px 10px;
+    animation:chipIn .25s ease;
+  }
+  @keyframes chipIn{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:translateY(0); } }
+  .radar-stats{ display:flex; gap:10px; margin-top:16px; }
+  .radar-stats .stat{ flex:1; background:var(--bg-panel); border:1px solid var(--line-dim); border-radius:10px; padding:10px; text-align:center; }
+  .radar-stats .stat .num{ font-family:var(--font-display); font-size:22px; color:var(--sig-teal); }
+  .radar-stats .stat .lbl{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+
+  /* ============ 方向スキャン（コンパス） ============ */
+  .compass-frame{
+    position:relative; width:100%; aspect-ratio:1/1; margin-top:18px; border-radius:50%;
+    background:radial-gradient(circle at 50% 50%, #0e2820 0%, #071410 70%, #050d0a 100%);
+    border:1px solid var(--line-dim); overflow:hidden;
+  }
+  .compass-tick{ position:absolute; top:50%; left:50%; width:1px; height:48%; background:rgba(79,232,200,.18); transform-origin:0 0; }
+  .compass-rotor{
+    position:absolute; inset:0; transition:transform .18s ease-out;
+  }
+  .compass-dir-label{
+    position:absolute; font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-dim);
+    transform:translate(-50%,-50%);
+  }
+  .compass-dir-label.n{ color:var(--sig-teal); }
+  .compass-me{
+    position:absolute; top:8%; left:50%; width:0; height:0;
+    border-left:8px solid transparent; border-right:8px solid transparent;
+    border-bottom:16px solid var(--sig-green); transform:translate(-50%,0); z-index:5;
+    filter:drop-shadow(0 0 6px rgba(91,255,168,.7));
+  }
+  .compass-me-dot{
+    position:absolute; top:50%; left:50%; width:12px; height:12px; margin:-6px;
+    background:var(--sig-teal); border-radius:50%; box-shadow:0 0 12px 4px rgba(79,232,200,.55); z-index:5;
+  }
+  .compass-best{
+    position:absolute; width:16px; height:16px; margin:-8px; border-radius:50%;
+    background:var(--gold); box-shadow:0 0 14px 5px rgba(255,215,107,.6); z-index:3;
+    display:flex; align-items:center; justify-content:center; font-size:10px;
+  }
+  .compass-best.hidden{ display:none; }
+  .dirscan-stats{ display:flex; gap:10px; margin-top:16px; }
+  .dirscan-stats .stat{ flex:1; background:var(--bg-panel); border:1px solid var(--line-dim); border-radius:10px; padding:10px; text-align:center; }
+  .dirscan-stats .stat .num{ font-family:var(--font-display); font-size:20px; color:var(--sig-teal); }
+  .dirscan-stats .stat .lbl{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+  .ontarget-banner{
+    margin-top:12px; padding:12px; border-radius:10px; text-align:center; font-weight:700;
+    background:rgba(255,215,107,.12); border:1px solid var(--gold); color:var(--gold);
+  }
+
+  /* ============ 音程チャレンジ ============ */
+  .pitch-progress{ display:flex; gap:6px; margin-top:14px; }
+  .pitch-progress .pdot{
+    flex:1; height:6px; border-radius:3px; background:var(--bg-panel); border:1px solid var(--line-dim);
+  }
+  .pitch-progress .pdot.done{ background:var(--sig-teal); border-color:var(--sig-teal); }
+  .pitch-progress .pdot.current{ background:var(--sig-amber); border-color:var(--sig-amber); }
+
+  .note-card{
+    margin-top:16px; text-align:center; padding:22px; border-radius:14px;
+    background:linear-gradient(180deg, var(--bg-panel), #081512); border:1px solid var(--line-dim);
+  }
+  .note-card .jp{ font-size:40px; font-weight:800; color:var(--sig-teal); }
+  .note-card .name{ font-family:var(--font-display); font-size:16px; color:var(--text-main); margin-top:4px; }
+  .note-card .freq{ font-family:var(--font-display); font-size:12px; color:var(--text-dim); margin-top:2px; }
+
+  .pitch-live{
+    margin-top:14px; text-align:center; font-family:var(--font-display); font-size:14px; color:var(--text-dim);
+  }
+  .pitch-live .val{ font-size:26px; font-weight:700; color:var(--sig-green); }
+  .pitch-countdown{
+    margin-top:8px; text-align:center; font-family:var(--font-display); font-size:13px; color:var(--sig-amber);
+  }
+
+  .pitch-result{ margin-top:16px; padding:18px; border-radius:14px; text-align:center; border:1px solid var(--line-dim); background:var(--bg-panel); }
+  .pitch-result .score{ font-family:var(--font-display); font-size:40px; font-weight:800; color:var(--sig-green); }
+  .pitch-result .fb{ font-size:13px; color:var(--text-dim); margin-top:6px; }
+
+  .pitch-breakdown{ margin-top:14px; display:flex; flex-direction:column; gap:6px; }
+  .pitch-breakdown .row{
+    display:flex; justify-content:space-between; align-items:center; padding:8px 12px;
+    background:var(--bg-panel); border:1px solid var(--line-dim); border-radius:8px; font-size:12.5px;
+  }
+  .pitch-breakdown .row b{ color:var(--sig-teal); font-family:var(--font-display); }
+
+  .log{ margin-top:16px; font-family:var(--font-display); font-size:11px; color:var(--text-dim); max-height:110px; overflow-y:auto; line-height:1.8; }
+  .log div span{ color:var(--sig-teal); }
+
+  footer{ text-align:center; margin-top:22px; font-size:10.5px; color:var(--text-dim); opacity:.6; }
+
+  /* ============ Steam風 実績トースト ============ */
+  .toast-container{
+    position:fixed; top:14px; left:50%; transform:translateX(-50%);
+    z-index:1000; width:calc(100% - 32px); max-width:480px;
+    display:flex; flex-direction:column; gap:8px; pointer-events:none;
+  }
+  .toast{
+    background:linear-gradient(135deg, #2b2110, #14100a);
+    border:1px solid var(--gold); border-left:5px solid var(--gold);
+    border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:12px;
+    box-shadow:0 10px 28px rgba(0,0,0,.5);
+    animation: toastIn .35s ease forwards, toastOut .4s ease 3.4s forwards;
+    opacity:0;
+  }
+  .toast .icon{
+    font-size:26px; width:38px; height:38px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff3cf, var(--gold) 60%, var(--gold-deep));
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .toast .body .label{ font-size:10px; letter-spacing:.15em; color:var(--gold); font-weight:700; }
+  .toast .body .title{ font-size:14px; font-weight:800; color:#fff; margin-top:1px; }
+  .toast .body .desc{ font-size:11px; color:#c9bfa0; margin-top:1px; }
+  @keyframes toastIn{ from{ opacity:0; transform:translateY(-14px) scale(.96); } to{ opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes toastOut{ from{ opacity:1; } to{ opacity:0; transform:translateY(-8px); } }
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">HAMAMURA LAB</div>
+    <h1>浜村研究室</h1>
+    <div class="sub">ディジタル無線通信の学習・オープンキャンパス体験用コンテンツです。アプリ不要、iOS・Android共通。</div>
+  </header>
+
+  <div class="panel">
+    <div class="notice">
+      <b>準備：</b> 本ページは <code>https://</code> のURLで開いてください（マイク使用に必須）。
+      使用する音は人間にはほとんど聞こえない高さ（17〜19.5kHz）ですが、聞こえ方には個人差があります。
+    </div>
+  </div>
+
+  <!-- ============ メインメニュー ============ -->
+  <div id="roleSelect">
+    <div class="role-grid">
+      <div class="role-card host" id="pickHost">
+        <div class="big">🔈</div>
+        <div><div class="ttl">主催者</div>
+        <div class="desc">音を設置して隠れる係（先生・出題係）</div></div>
+      </div>
+      <div class="role-card seek" id="pickSeek">
+        <div class="big">🎯</div>
+        <div><div class="ttl">隠れ音コレクション</div>
+        <div class="desc">6つの音を歩いて集める・ちょうどいい場所を探す（生徒）</div></div>
+      </div>
+      <div class="role-card seek" id="pickRadar">
+        <div class="big">📡</div>
+        <div><div class="ttl">音レーダー</div>
+        <div class="desc">6方向の音源をレーダー画面でリアルタイムに探る（生徒）</div></div>
+      </div>
+      <div class="role-card seek" id="pickDirScan">
+        <div class="big">🧭</div>
+        <div><div class="ttl">方向スキャン（実験的）</div>
+        <div class="desc">その場で回転して一番強く聞こえる方角を記録する（生徒）</div></div>
+      </div>
+      <div class="role-card seek" id="pickPitch">
+        <div class="big">🎤</div>
+        <div><div class="ttl">音程チャレンジ</div>
+        <div class="desc">お題の音をお手本で聞いて、自分の声で歌って当てる（5問・500点満点）</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 主催者モード ============ -->
+  <div class="panel hidden" id="hostPanel">
+    <div class="chan-title">① 設置するチャンネルを選ぶ（1台につき1チャンネル）</div>
+    <div class="chan-grid" id="chanGrid"></div>
+
+    <div class="chan-title">② 音量を調整する</div>
+    <input type="range" id="volSlider" min="0" max="100" value="60" style="width:100%;">
+    <div style="text-align:center; font-family:var(--font-display); font-size:13px; color:var(--sig-amber); margin-top:4px;" id="volValue">60%</div>
+
+    <div class="status-row"><div class="dot" id="dotTx"></div><div class="status-text" id="txText">未発信</div></div>
+    <button class="act btn-host" id="txBtn">③ 発信開始（このまま設置する）</button>
+    <button class="act btn-off hidden" id="txOffBtn">発信終了</button>
+
+    <div class="notice" style="margin-top:14px;">
+      発信を開始したら、教室内の好きな場所に静かに置いてください。6台をそれぞれ別の場所（できれば
+      部屋を囲むように）配置すると，同時モード・順番モードのどちらでも遊びやすくなります。
+      検出されにくい場合はこの音量を上げてみてください（発信中でも調整できます）。
+    </div>
+
+    <button class="act btn-back" id="hostBack">役割選択に戻る</button>
+  </div>
+
+  <!-- ============ モード選択 ============ -->
+  <div class="panel hidden" id="modeSelect">
+    <div class="chan-title" style="margin-top:0;">遊び方を選ぶ</div>
+    <div class="mode-grid">
+      <div class="role-card simul" id="pickSimul">
+        <div class="big">📍</div>
+        <div class="ttl">同時モード</div>
+        <div class="desc">ちょうどいい場所を見つけて<br>6つ全部を同時に検出する</div>
+      </div>
+      <div class="role-card order" id="pickOrder">
+        <div class="big">🧭</div>
+        <div class="ttl">順番モード</div>
+        <div class="desc">歩き回って<br>1つずつ集めていく</div>
+      </div>
+    </div>
+    <button class="act btn-back" id="modeBack">役割選択に戻る</button>
+  </div>
+
+  <!-- ============ 順番モード（1つずつ） ============ -->
+  <div class="panel hidden" id="orderPanel">
+    <div class="status-row"><div class="dot" id="dotRxO"></div><div class="status-text" id="rxTextO">未探索</div></div>
+    <button class="act btn-seek" id="rxBtnO">探索開始</button>
+    <button class="act btn-off hidden" id="rxOffBtnO">探索終了</button>
+
+    <div class="gauge-wrap">
+      <div class="gauge-track"><div class="gauge-fill" id="gaugeFill"></div></div>
+      <div class="gauge-percent" id="gaugePercent">0%</div>
+      <div class="gauge-label" id="gaugeLabel" style="color:var(--text-dim);">さがし中…</div>
+      <div class="hold-bar-track"><div class="hold-bar-fill" id="holdBarFillO"></div></div>
+      <div class="hold-hint" id="holdHintO">近づくとキープが始まります</div>
+      <div style="margin-top:10px; font-family:var(--font-display); font-size:12px; color:var(--text-dim);">
+        反応中のチャンネル: <span id="activeChanO" style="color:var(--sig-teal); font-weight:700;">--</span>
+      </div>
+    </div>
+
+    <div class="zukan-title"><span>収集状況</span><span class="count" id="zukanCount">0 / 6</span></div>
+    <div class="zukan" id="zukan"></div>
+
+    <div id="completeBannerO" class="complete-banner hidden">
+      <div class="big">🏆 コンプリート！</div>
+      <div class="welcome-msg" id="welcomeMsgO">はまむら研にようこそ</div>
+      <div class="time" id="completeTimeO"></div>
+    </div>
+
+    <button class="act btn-back" id="orderBack">モード選択に戻る</button>
+  </div>
+
+  <!-- ============ 同時モード（ちょうどいい場所） ============ -->
+  <div class="panel hidden" id="simulPanel">
+    <div class="status-row"><div class="dot" id="dotRxS"></div><div class="status-text" id="rxTextS">未探索</div></div>
+    <button class="act btn-seek" id="rxBtnS">探索開始</button>
+    <button class="act btn-off hidden" id="rxOffBtnS">探索終了</button>
+
+    <div style="margin-top:18px;" id="barList"></div>
+
+    <div class="simul-count">
+      <div class="num" id="simulNum">0</div>
+      <div class="lbl">同時に検出中のチャンネル数（全6）</div>
+    </div>
+
+    <div class="hold-bar-track"><div class="hold-bar-fill" id="holdBarFillS"></div></div>
+    <div class="hold-hint" id="holdHintS">3つ以上を同時に検出するとキープが始まります</div>
+
+    <div class="ach-list" id="achList"></div>
+
+    <div id="completeBannerS" class="complete-banner hidden">
+      <div class="big">🏆 パーフェクトスポット発見！</div>
+      <div class="welcome-msg">はまむら研にようこそ</div>
+      <div class="time" id="completeTimeS">6チャンネル同時検出に成功しました</div>
+    </div>
+
+    <button class="act btn-back" id="simulBack">モード選択に戻る</button>
+  </div>
+
+  <!-- ============ 音レーダー ============ -->
+  <div class="panel hidden" id="radarPanel">
+    <div class="chan-title" style="margin-top:0;">音レーダー</div>
+    <div class="sub" style="margin-top:0; text-align:left;">
+      ソナーのように、中心から広がる波が各チャンネルの「持ち場」を通過した瞬間、そのとき検出できていた音だけがピンッと光ります。
+      ※持ち場の角度は実際の方角ではありません（マイク1つでは方向はわかりません）。
+    </div>
+    <div class="notice" style="margin-top:10px;">
+      <b id="radarLastDetect">まだ何も検出していません</b>
+    </div>
+
+    <div class="status-row"><div class="dot" id="dotRxR"></div><div class="status-text" id="rxTextR">未探索</div></div>
+    <button class="act btn-seek" id="rxBtnR">探索開始</button>
+    <button class="act btn-off hidden" id="rxOffBtnR">探索終了</button>
+
+    <div class="radar-frame" id="radarFrame">
+      <div class="radar-ring radar-r1"></div>
+      <div class="radar-ring radar-r2"></div>
+      <div class="radar-ring radar-r3"></div>
+      <div class="radar-ring radar-r4"></div>
+      <div class="radar-pulse" id="radarPulse"></div>
+      <div class="radar-me"></div>
+    </div>
+
+    <div class="chan-title" style="margin-bottom:4px;">凡例（CH1〜6・点滅中は検出中）</div>
+    <div class="radar-legend" id="radarLegend"></div>
+
+    <div class="chan-title" style="margin-bottom:4px;">検出履歴（10秒で消えます）</div>
+    <div class="radar-detect-list" id="radarDetectList"></div>
+
+    <div class="radar-stats">
+      <div class="stat"><div class="num" id="radarStrength">0%</div><div class="lbl">信号強度（最大チャンネル）</div></div>
+    </div>
+
+    <button class="act btn-back" id="radarBack">メインメニューに戻る</button>
+  </div>
+
+  <!-- ============ 方向スキャン ============ -->
+  <div class="panel hidden" id="dirScanPanel">
+    <div class="chan-title" style="margin-top:0;">方向スキャン（実験的）</div>
+    <div class="sub" style="margin-top:0; text-align:left;">
+      その場でゆっくり体（またはスマホ）を1周回転させながら、一番音が強く聞こえた方角を記録します。
+    </div>
+    <div class="notice">
+      <b>精度についての注意：</b> スマホ1つのマイクでは正確な方向は測れません。これはコンパス(方位センサー)と
+      音の強さを組み合わせた簡易的な目安です。金属製の机や電子機器の近くでは方位がずれることがあります。
+      iPhoneでは方位センサーの使用許可を求められる場合があります。
+    </div>
+    <div class="notice">
+      <b>マイクの位置によるズレについて：</b> スマホのマイクは通話口(下側)についている前提で計算しています。
+      それでも「正面」の感じ方がズレる場合は、実際にその場で一番強く聞こえる方向を向いてから
+      「キャリブレーション」ボタンを押すと、その方向を正面(0°)として記録し直せます。
+    </div>
+
+    <button class="act btn-back" id="calibrateBtn">📍 今向いている方向を正面にする（キャリブレーション）</button>
+
+    <button class="act btn-seek" id="dirScanBtn">方向スキャン開始</button>
+    <button class="act btn-off hidden" id="dirScanOffBtn">スキャン終了</button>
+
+    <div class="compass-frame" id="compassFrame">
+      <div class="compass-rotor" id="compassRotor">
+        <div class="compass-best hidden" id="compassBest"></div>
+      </div>
+      <div class="compass-me-dot"></div>
+      <div class="compass-me" title="あなたが向いている方向"></div>
+    </div>
+
+    <div id="ontargetBanner" class="ontarget-banner hidden">🎯 その方向で合ってるかも！</div>
+
+    <div class="dirscan-stats">
+      <div class="stat"><div class="num" id="dirCurrentPct">0%</div><div class="lbl">現在の強さ</div></div>
+      <div class="stat"><div class="num" id="dirBestHeading">--°</div><div class="lbl">音の方向（自分から見て）</div></div>
+    </div>
+
+    <button class="act btn-back" id="dirResetBtn">記録をリセット</button>
+    <button class="act btn-back" id="dirScanBack">メインメニューに戻る</button>
+  </div>
+
+  <!-- ============ 音程チャレンジ ============ -->
+  <div class="panel hidden" id="pitchPanel">
+
+    <!-- イントロ -->
+    <div id="pitchIntro">
+      <div class="chan-title" style="margin-top:0;">音程チャレンジ</div>
+      <div class="sub" style="margin-top:0; text-align:left;">
+        お手本の音を聞いて、その高さに合わせて声を出そう。ぴったり近いほど高得点！
+        全5問、1問100点で合計500点満点です。
+      </div>
+      <div class="notice">
+        <b>遊び方：</b> ①「お手本を聞く」で音を確認 → ②「録音して判定」を押すと1.5秒間録音されるので、
+        その音の高さで「あー」と声を伸ばして歌ってください → ③自動採点されます。
+        音域が合わなくてオクターブ違いで歌っても、大きくは減点しません。
+      </div>
+      <button class="act btn-seek" id="pitchStartBtn">スタート</button>
+      <button class="act btn-back" id="pitchIntroBack">メインメニューに戻る</button>
+    </div>
+
+    <!-- 出題・録音 -->
+    <div id="pitchQuestion" class="hidden">
+      <div class="pitch-progress" id="pitchProgress"></div>
+
+      <div class="note-card">
+        <div class="jp" id="noteJp">ラ</div>
+        <div class="name" id="noteName">A4</div>
+        <div class="freq" id="noteFreq">440.0 Hz</div>
+      </div>
+
+      <button class="act btn-host" id="playExampleBtn">🔊 お手本を聞く</button>
+      <button class="act btn-seek" id="recordBtn">🎙️ 録音して判定（1.5秒）</button>
+
+      <div class="pitch-live hidden" id="pitchLiveWrap">
+        <div>今聞こえている声の高さ</div>
+        <div class="val" id="pitchLiveVal">-- Hz</div>
+      </div>
+      <div class="pitch-countdown hidden" id="pitchCountdown"></div>
+    </div>
+
+    <!-- 1問ごとの結果 -->
+    <div id="pitchResult" class="hidden">
+      <div class="pitch-result">
+        <div class="score" id="pitchScoreVal">0<span style="font-size:16px;color:var(--text-dim);"> / 100点</span></div>
+        <div class="fb" id="pitchFeedback">判定中…</div>
+      </div>
+      <button class="act btn-back" id="pitchRetryBtn">もう一度録音する</button>
+      <button class="act btn-seek" id="pitchNextBtn">次の問題へ</button>
+    </div>
+
+    <!-- 最終結果 -->
+    <div id="pitchFinal" class="hidden">
+      <div class="complete-banner">
+        <div class="big">🏆 全問終了！</div>
+        <div class="welcome-msg">はまむら研にようこそ</div>
+        <div class="time" id="pitchTotalScore">合計スコア: 0 / 500点</div>
+      </div>
+      <div class="pitch-breakdown" id="pitchBreakdown"></div>
+      <button class="act btn-seek" id="pitchRestartBtn">もう一度挑戦する</button>
+      <button class="act btn-back" id="pitchBack">メインメニューに戻る</button>
+    </div>
+
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <footer>Web Audio API (OscillatorNode / AnalyserNode) を使用。Bluetoothは使用していません。</footer>
+</div>
+
+<script>
+(function(){
+  const CHANNELS = [
+    { id:1, freq:14500 },
+    { id:2, freq:15100 },
+    { id:3, freq:15700 },
+    { id:4, freq:16300 },
+    { id:5, freq:16900 },
+    { id:6, freq:17500 },
+  ];
+
+  const FOUND_THRESHOLD = 45;   // 順番モード：発見判定（90→45にさらに緩和）
+  const HOT_THRESHOLD   = 120;  // 旧150→120
+  const WARM_THRESHOLD  = 80;   // 旧100→80
+  const COOL_THRESHOLD  = 40;   // 旧50→40
+  const FOUND_HOLD_MS   = 10000; // 10秒キープで発見
+
+  const SIMUL_THRESHOLD = 28;   // 同時モード：検出中とみなすしきい値（55→28にさらに緩和）
+  const SIMUL_HOLD_MS   = 10000; // 10秒キープで実績解除
+
+  // ---------- DOM: 共通 ----------
+  const roleSelect = document.getElementById('roleSelect');
+  const pickHost = document.getElementById('pickHost');
+  const pickSeek = document.getElementById('pickSeek');
+  const pickRadar = document.getElementById('pickRadar');
+  const hostPanel = document.getElementById('hostPanel');
+  const hostBack = document.getElementById('hostBack');
+  const modeSelect = document.getElementById('modeSelect');
+  const modeBack = document.getElementById('modeBack');
+  const pickSimul = document.getElementById('pickSimul');
+  const pickOrder = document.getElementById('pickOrder');
+  const orderPanel = document.getElementById('orderPanel');
+  const orderBack = document.getElementById('orderBack');
+  const simulPanel = document.getElementById('simulPanel');
+  const simulBack = document.getElementById('simulBack');
+  const radarPanel = document.getElementById('radarPanel');
+  const radarBack = document.getElementById('radarBack');
+  const pickDirScan = document.getElementById('pickDirScan');
+  const dirScanPanel = document.getElementById('dirScanPanel');
+  const dirScanBack = document.getElementById('dirScanBack');
+  const pickPitch = document.getElementById('pickPitch');
+  const pitchPanel = document.getElementById('pitchPanel');
+  const pitchIntroBack = document.getElementById('pitchIntroBack');
+  const pitchBack = document.getElementById('pitchBack');
+  const logEl = document.getElementById('log');
+  const toastContainer = document.getElementById('toastContainer');
+
+  function log(msg){
+    const line = document.createElement('div');
+    const t = new Date().toLocaleTimeString('ja-JP', {hour12:false});
+    line.innerHTML = '<span>['+t+']</span> ' + msg;
+    logEl.prepend(line);
+    while(logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+  }
+
+  function showToast(title, desc){
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML =
+      '<div class="icon">🏆</div>' +
+      '<div class="body">' +
+        '<div class="label">実績解除</div>' +
+        '<div class="title">' + title + '</div>' +
+        '<div class="desc">' + (desc || '') + '</div>' +
+      '</div>';
+    toastContainer.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 4000);
+  }
+
+  function showPanel(panel){
+    [roleSelect, hostPanel, modeSelect, orderPanel, simulPanel, radarPanel, dirScanPanel, pitchPanel].forEach(p => p.classList.add('hidden'));
+    panel.classList.remove('hidden');
+  }
+
+  pickHost.addEventListener('click', () => showPanel(hostPanel));
+  pickSeek.addEventListener('click', () => showPanel(modeSelect));
+  pickRadar.addEventListener('click', () => showPanel(radarPanel));
+  pickDirScan.addEventListener('click', () => showPanel(dirScanPanel));
+  pickPitch.addEventListener('click', () => showPanel(pitchPanel));
+  hostBack.addEventListener('click', () => { stopOscillator(); showPanel(roleSelect); });
+  modeBack.addEventListener('click', () => showPanel(roleSelect));
+  pickSimul.addEventListener('click', () => showPanel(simulPanel));
+  pickOrder.addEventListener('click', () => showPanel(orderPanel));
+  orderBack.addEventListener('click', () => { stopReceivingOrder(); showPanel(modeSelect); });
+  simulBack.addEventListener('click', () => { stopReceivingSimul(); showPanel(modeSelect); });
+  radarBack.addEventListener('click', () => { stopRadar(); showPanel(roleSelect); });
+  dirScanBack.addEventListener('click', () => { stopDirScan(); showPanel(roleSelect); });
+  pitchIntroBack.addEventListener('click', () => showPanel(roleSelect));
+  pitchBack.addEventListener('click', () => { stopPitchMic(); showPanel(roleSelect); });
+
+  let audioCtx = null;
+  function getAudioCtx(){
+    if(!audioCtx){ const Ctx = window.AudioContext || window.webkitAudioContext; audioCtx = new Ctx(); }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // ============ 主催者：発信 ============
+  const chanGrid = document.getElementById('chanGrid');
+  const txBtn = document.getElementById('txBtn');
+  const txOffBtn = document.getElementById('txOffBtn');
+  const dotTx = document.getElementById('dotTx');
+  const txText = document.getElementById('txText');
+
+  let selectedChannel = CHANNELS[0].id;
+  let oscillator = null, gainNode = null;
+
+  function renderChanGrid(){
+    chanGrid.innerHTML = '';
+    CHANNELS.forEach(c => {
+      const btn = document.createElement('div');
+      btn.className = 'chan-btn' + (c.id === selectedChannel ? ' selected' : '');
+      btn.textContent = 'CH' + c.id;
+      btn.addEventListener('click', () => {
+        selectedChannel = c.id;
+        renderChanGrid();
+        if(oscillator){ restartOscillator(); }
+      });
+      chanGrid.appendChild(btn);
+    });
+  }
+  renderChanGrid();
+
+  const volSlider = document.getElementById('volSlider');
+  const volValue = document.getElementById('volValue');
+  let currentGain = sliderToGain(volSlider.value);
+  function sliderToGain(v){ return (v/100) * 0.8; } // スライダー100%でgain=0.8（音割れ防止のため上限を設定）
+  volSlider.addEventListener('input', () => {
+    currentGain = sliderToGain(volSlider.value);
+    volValue.textContent = volSlider.value + '%';
+    if(gainNode){
+      const ctx = getAudioCtx();
+      gainNode.gain.linearRampToValueAtTime(currentGain, ctx.currentTime + 0.08);
+    }
+  });
+
+  function startOscillator(){
+    const ctx = getAudioCtx();
+    const chan = CHANNELS.find(c => c.id === selectedChannel);
+    oscillator = ctx.createOscillator();
+    gainNode = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = chan.freq;
+    gainNode.gain.value = 0;
+    oscillator.connect(gainNode).connect(ctx.destination);
+    oscillator.start();
+    gainNode.gain.linearRampToValueAtTime(currentGain, ctx.currentTime + 0.3);
+
+    dotTx.classList.add('on');
+    txText.textContent = 'CH' + selectedChannel + ' 発信中（設置可）';
+    txBtn.classList.add('hidden');
+    txOffBtn.classList.remove('hidden');
+    log('主催者: CH' + selectedChannel + ' の発信を開始（音量 ' + volSlider.value + '%）');
+  }
+  function stopOscillator(){
+    if(oscillator){
+      const ctx = getAudioCtx();
+      gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+      const osc = oscillator, gn = gainNode;
+      setTimeout(() => { try{ osc.stop(); osc.disconnect(); gn.disconnect(); }catch(e){} }, 250);
+      oscillator = null; gainNode = null;
+    }
+    dotTx.classList.remove('on');
+    txText.textContent = '未発信';
+    txBtn.classList.remove('hidden');
+    txOffBtn.classList.add('hidden');
+    log('主催者: 発信を終了');
+  }
+  function restartOscillator(){ stopOscillator(); setTimeout(startOscillator, 250); }
+  txBtn.addEventListener('click', startOscillator);
+  txOffBtn.addEventListener('click', stopOscillator);
+
+  function freqToBin(analyser, freq){
+    const ctx = getAudioCtx();
+    const nyquist = ctx.sampleRate / 2;
+    return Math.round(freq / nyquist * analyser.frequencyBinCount);
+  }
+
+  // ピークホールド＋緩やかな減衰（値が上がるときは即座に反応、下がるときは少しずつ減衰）
+  const DECAY_PER_FRAME = 0.8; // 0-255スケールで毎フレームこの量だけ減衰（約60fpsで5秒強かけて0まで落ちる）
+  function decayTo(current, rawValue){
+    return Math.max(rawValue, current - DECAY_PER_FRAME);
+  }
+
+  // ============ 順番モード ============
+  const rxBtnO = document.getElementById('rxBtnO');
+  const rxOffBtnO = document.getElementById('rxOffBtnO');
+  const dotRxO = document.getElementById('dotRxO');
+  const rxTextO = document.getElementById('rxTextO');
+  const gaugeFill = document.getElementById('gaugeFill');
+  const gaugePercent = document.getElementById('gaugePercent');
+  const gaugeLabel = document.getElementById('gaugeLabel');
+  const holdBarFillO = document.getElementById('holdBarFillO');
+  const holdHintO = document.getElementById('holdHintO');
+  const activeChanO = document.getElementById('activeChanO');
+  const zukanEl = document.getElementById('zukan');
+  const zukanCount = document.getElementById('zukanCount');
+  const completeBannerO = document.getElementById('completeBannerO');
+  const completeTimeO = document.getElementById('completeTimeO');
+
+  let analyserO = null, micStreamO = null, micSourceO = null, rxRunningO = false;
+  let collected = new Set();
+  let searchStartedAt = null;
+
+  function renderZukan(){
+    zukanEl.innerHTML = '';
+    CHANNELS.forEach(c => {
+      const cell = document.createElement('div');
+      const isGot = collected.has(c.id);
+      cell.className = 'cell' + (isGot ? ' got' : '');
+      cell.innerHTML = '<div class="num">' + (isGot ? c.id : '?') + '</div>' +
+        (isGot ? '<div class="time">発見済み</div>' : '<div class="time">未発見</div>');
+      zukanEl.appendChild(cell);
+    });
+    zukanCount.textContent = collected.size + ' / ' + CHANNELS.length;
+  }
+  renderZukan();
+
+  async function startReceivingOrder(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      rxTextO.textContent = 'マイクが使用できません（httpsで開いているか確認）';
+      return;
+    }
+    try{
+      micStreamO = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceO = ctx.createMediaStreamSource(micStreamO);
+      analyserO = ctx.createAnalyser();
+      analyserO.fftSize = 8192;
+      micSourceO.connect(analyserO);
+
+      rxRunningO = true;
+      searchStartedAt = searchStartedAt || Date.now();
+      CHANNELS.forEach(c => { smoothedO[c.id] = 0; });
+      holdProgressO = 0;
+      lastTickO = null;
+      dotRxO.classList.add('on');
+      rxTextO.textContent = '探索中…';
+      rxBtnO.classList.add('hidden');
+      rxOffBtnO.classList.remove('hidden');
+      log('探索者(順番): 探索を開始');
+      tickOrder();
+    } catch(err){
+      rxTextO.textContent = 'エラー: ' + err.message;
+      log('マイク許可の取得に失敗: ' + err.message);
+    }
+  }
+  function stopReceivingOrder(){
+    rxRunningO = false;
+    if(micStreamO){ micStreamO.getTracks().forEach(t => t.stop()); micStreamO = null; }
+    if(micSourceO){ micSourceO.disconnect(); micSourceO = null; }
+    analyserO = null;
+    holdProgressO = 0;
+    lastTickO = null;
+    dotRxO.classList.remove('on');
+    rxTextO.textContent = '未探索';
+    rxBtnO.classList.remove('hidden');
+    rxOffBtnO.classList.add('hidden');
+    gaugeFill.style.height = '6%';
+    gaugePercent.textContent = '0%';
+    gaugeLabel.textContent = '探索を中断中';
+    gaugeLabel.style.color = 'var(--text-dim)';
+    holdBarFillO.style.width = '0%';
+    holdHintO.textContent = '近づくとキープが始まります';
+    activeChanO.textContent = '--';
+    log('探索者(順番): 探索を終了');
+  }
+  rxBtnO.addEventListener('click', startReceivingOrder);
+  rxOffBtnO.addEventListener('click', stopReceivingOrder);
+
+  let smoothedO = {};
+  CHANNELS.forEach(c => { smoothedO[c.id] = 0; });
+  let holdProgressO = 0;   // 0〜FOUND_HOLD_MS（ms）で進行を蓄積
+  let lastTickO = null;
+
+  function tickOrder(){
+    if(!rxRunningO || !analyserO) return;
+    const data = new Uint8Array(analyserO.frequencyBinCount);
+    analyserO.getByteFrequencyData(data);
+
+    let maxPeak = 0, maxChan = null;
+    CHANNELS.forEach(c => {
+      if(collected.has(c.id)) return;
+      const bin = freqToBin(analyserO, c.freq);
+      let rawPeak = 0;
+      for(let i=Math.max(0,bin-2); i<=bin+2; i++){ if(data[i] > rawPeak) rawPeak = data[i]; }
+      smoothedO[c.id] = decayTo(smoothedO[c.id], rawPeak);
+      if(smoothedO[c.id] > maxPeak){ maxPeak = smoothedO[c.id]; maxChan = c.id; }
+    });
+
+    if(collected.size >= CHANNELS.length){
+      gaugeFill.style.height = '100%';
+      gaugePercent.textContent = '100%';
+      gaugeLabel.textContent = '全て収集済み';
+      gaugeLabel.style.color = 'var(--sig-green)';
+      holdBarFillO.style.width = '0%';
+      holdHintO.textContent = 'コンプリート！';
+      return;
+    }
+
+    const pct = Math.min(100, (maxPeak/255)*100);
+    gaugeFill.style.height = Math.max(6, pct) + '%';
+    gaugePercent.textContent = Math.round(pct) + '%';
+    activeChanO.textContent = (maxChan !== null && maxPeak >= SIMUL_THRESHOLD) ? ('CH' + maxChan) : '--';
+
+    const now = Date.now();
+    const dt = lastTickO ? Math.min(200, now - lastTickO) : 16; // フレーム間隔（異常値は200msでクランプ）
+    lastTickO = now;
+    const isHolding = maxPeak >= FOUND_THRESHOLD;
+
+    if(isHolding){
+      holdProgressO = Math.min(FOUND_HOLD_MS, holdProgressO + dt);
+      gaugeLabel.textContent = 'キープ中…はなさないで！';
+      gaugeLabel.style.color = 'var(--sig-green)';
+    } else {
+      // 途切れてもすぐには0に戻さず、FOUND_HOLD_MSと同じ時間（約10秒）かけてゆっくり戻る
+      holdProgressO = Math.max(0, holdProgressO - dt);
+      gaugeLabel.textContent = 'さがし中…';
+      gaugeLabel.style.color = 'var(--text-dim)';
+    }
+
+    const holdPct = (holdProgressO / FOUND_HOLD_MS) * 100;
+    holdBarFillO.style.width = holdPct + '%';
+    if(holdProgressO > 0){
+      const remain = Math.max(0, (FOUND_HOLD_MS - holdProgressO) / 1000).toFixed(1);
+      holdHintO.textContent = isHolding ? ('あと ' + remain + ' 秒キープ！') : ('キープ解除中…（あと ' + remain + ' 秒で消えます）');
+    } else {
+      holdHintO.textContent = pct >= (FOUND_THRESHOLD/255*100*0.6) ? 'もう少し近づこう！' : '近づくとキープが始まります';
+    }
+
+    if(holdProgressO >= FOUND_HOLD_MS){
+      onCollect(maxChan);
+      holdProgressO = 0;
+      holdBarFillO.style.width = '0%';
+    }
+
+    requestAnimationFrame(tickOrder);
+  }
+
+  function onCollect(chanId){
+    if(collected.has(chanId)) return;
+    collected.add(chanId);
+    renderZukan();
+
+    const elapsedSec = ((Date.now() - searchStartedAt) / 1000).toFixed(1);
+    log('発見: CH' + chanId + '（経過 ' + elapsedSec + '秒、収集数 ' + collected.size + '/' + CHANNELS.length + '）');
+    showToast('CH' + chanId + ' を発見', collected.size + ' / ' + CHANNELS.length + ' 収集（経過 ' + elapsedSec + '秒）');
+
+    if(collected.size >= CHANNELS.length){
+      const totalSec = ((Date.now() - searchStartedAt) / 1000).toFixed(1);
+      completeTimeO.textContent = '合計タイム: ' + totalSec + '秒';
+      completeBannerO.classList.remove('hidden');
+      log('🏆 全チャンネル収集完了！ 合計 ' + totalSec + '秒');
+      showToast('はまむら研にようこそ', '全6チャンネルを収集（合計 ' + totalSec + '秒）');
+    }
+  }
+
+  // ============ 同時モード ============
+  const rxBtnS = document.getElementById('rxBtnS');
+  const rxOffBtnS = document.getElementById('rxOffBtnS');
+  const dotRxS = document.getElementById('dotRxS');
+  const rxTextS = document.getElementById('rxTextS');
+  const barList = document.getElementById('barList');
+  const simulNum = document.getElementById('simulNum');
+  const holdBarFillS = document.getElementById('holdBarFillS');
+  const holdHintS = document.getElementById('holdHintS');
+  const achList = document.getElementById('achList');
+  const completeBannerS = document.getElementById('completeBannerS');
+
+  const TIERS = [
+    { n:3, id:'t3', title:'3つ同時検出', desc:'同時に3チャンネルを検出する' },
+    { n:5, id:'t5', title:'5つ同時検出', desc:'同時に5チャンネルを検出する' },
+    { n:6, id:'t6', title:'パーフェクトスポット', desc:'6チャンネル全て同時に検出する' },
+  ];
+  let unlockedTiers = new Set();
+  let tierHoldProgress = {};
+
+  function renderBarList(){
+    barList.innerHTML = '';
+    CHANNELS.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.id = 'srow-ch'+c.id;
+      row.innerHTML = '<div class="bar-label">CH'+c.id+'</div><div class="bar-track"><div class="bar-fill" id="sfill-ch'+c.id+'"></div></div>';
+      barList.appendChild(row);
+    });
+  }
+  renderBarList();
+
+  function renderAchList(){
+    achList.innerHTML = '';
+    TIERS.forEach(t => {
+      const got = unlockedTiers.has(t.id);
+      const row = document.createElement('div');
+      row.className = 'ach-row' + (got ? ' unlocked' : '');
+      row.innerHTML = '<div class="ach-icon">' + (got ? '🏆' : '🔒') + '</div>' +
+        '<div class="ach-text"><div class="t">' + t.title + '</div><div class="d">' + t.desc + '</div></div>';
+      achList.appendChild(row);
+    });
+  }
+  renderAchList();
+
+  let analyserS = null, micStreamS = null, micSourceS = null, rxRunningS = false;
+
+  async function startReceivingSimul(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      rxTextS.textContent = 'マイクが使用できません（httpsで開いているか確認）';
+      return;
+    }
+    try{
+      micStreamS = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceS = ctx.createMediaStreamSource(micStreamS);
+      analyserS = ctx.createAnalyser();
+      analyserS.fftSize = 8192;
+      micSourceS.connect(analyserS);
+
+      rxRunningS = true;
+      CHANNELS.forEach(c => { smoothedS[c.id] = 0; });
+      tierHoldProgress = {};
+      lastTickS = null;
+      dotRxS.classList.add('on');
+      rxTextS.textContent = '探索中… ちょうどいい場所を探そう';
+      rxBtnS.classList.add('hidden');
+      rxOffBtnS.classList.remove('hidden');
+      log('探索者(同時): 探索を開始');
+      tickSimul();
+    } catch(err){
+      rxTextS.textContent = 'エラー: ' + err.message;
+      log('マイク許可の取得に失敗: ' + err.message);
+    }
+  }
+  function stopReceivingSimul(){
+    rxRunningS = false;
+    if(micStreamS){ micStreamS.getTracks().forEach(t => t.stop()); micStreamS = null; }
+    if(micSourceS){ micSourceS.disconnect(); micSourceS = null; }
+    analyserS = null;
+    tierHoldProgress = {};
+    lastTickS = null;
+    dotRxS.classList.remove('on');
+    rxTextS.textContent = '未探索';
+    rxBtnS.classList.remove('hidden');
+    rxOffBtnS.classList.add('hidden');
+    holdBarFillS.style.width = '0%';
+    holdHintS.textContent = '3つ以上を同時に検出するとキープが始まります';
+    log('探索者(同時): 探索を終了');
+  }
+  rxBtnS.addEventListener('click', startReceivingSimul);
+  rxOffBtnS.addEventListener('click', stopReceivingSimul);
+
+  let smoothedS = {};
+  CHANNELS.forEach(c => { smoothedS[c.id] = 0; });
+
+  let lastTickS = null;
+
+  function tickSimul(){
+    if(!rxRunningS || !analyserS) return;
+    const data = new Uint8Array(analyserS.frequencyBinCount);
+    analyserS.getByteFrequencyData(data);
+
+    let activeCount = 0;
+    CHANNELS.forEach(c => {
+      const bin = freqToBin(analyserS, c.freq);
+      let rawPeak = 0;
+      for(let i=Math.max(0,bin-2); i<=bin+2; i++){ if(data[i] > rawPeak) rawPeak = data[i]; }
+      smoothedS[c.id] = decayTo(smoothedS[c.id], rawPeak);
+      const peak = smoothedS[c.id];
+      const pct = Math.min(100, (peak/255)*100);
+      const fillEl = document.getElementById('sfill-ch'+c.id);
+      const rowEl = document.getElementById('srow-ch'+c.id);
+      if(fillEl) fillEl.style.width = pct + '%';
+      const active = peak >= SIMUL_THRESHOLD;
+      if(rowEl) rowEl.classList.toggle('active', active);
+      if(active) activeCount++;
+    });
+
+    simulNum.textContent = activeCount;
+
+    const now = Date.now();
+    const dt = lastTickS ? Math.min(200, now - lastTickS) : 16;
+    lastTickS = now;
+
+    let anyUnlockedThisFrame = false;
+    // 次に狙う（まだ解除していない最初の）ティアの進捗を表示する
+    const nextTier = TIERS.find(t => !unlockedTiers.has(t.id));
+
+    TIERS.forEach(t => {
+      if(unlockedTiers.has(t.id)) return;
+      if(tierHoldProgress[t.id] === undefined) tierHoldProgress[t.id] = 0;
+      if(activeCount >= t.n){
+        tierHoldProgress[t.id] = Math.min(SIMUL_HOLD_MS, tierHoldProgress[t.id] + dt);
+        if(tierHoldProgress[t.id] >= SIMUL_HOLD_MS){
+          unlockedTiers.add(t.id);
+          renderAchList();
+          log('🏆 実績解除: ' + t.title);
+          showToast(t.title, t.desc);
+          anyUnlockedThisFrame = true;
+          if(t.id === 't6'){
+            completeBannerS.classList.remove('hidden');
+          }
+        }
+      } else {
+        // 条件を満たさなくなってもすぐ0にはせず、SIMUL_HOLD_MSと同じ時間（約10秒）かけて戻す
+        tierHoldProgress[t.id] = Math.max(0, tierHoldProgress[t.id] - dt);
+      }
+    });
+
+    if(nextTier && !anyUnlockedThisFrame){
+      const progress = tierHoldProgress[nextTier.id] || 0;
+      const holdPct = (progress / SIMUL_HOLD_MS) * 100;
+      holdBarFillS.style.width = holdPct + '%';
+      if(activeCount >= nextTier.n){
+        const remain = Math.max(0, (SIMUL_HOLD_MS - progress) / 1000).toFixed(1);
+        holdHintS.textContent = nextTier.title + ' キープ中…あと ' + remain + ' 秒！';
+      } else if(progress > 0){
+        const remain = Math.max(0, (SIMUL_HOLD_MS - progress) / 1000).toFixed(1);
+        holdHintS.textContent = nextTier.title + ' 解除中…（あと ' + remain + ' 秒で消えます）';
+      } else {
+        const need = Math.max(0, nextTier.n - activeCount);
+        holdHintS.textContent = nextTier.title + ' まであと ' + need + ' チャンネル';
+      }
+    } else if(!nextTier){
+      holdBarFillS.style.width = '100%';
+      holdHintS.textContent = '全ての実績を解除しました！';
+    }
+
+    requestAnimationFrame(tickSimul);
+  }
+
+  // ============ 音レーダー ============
+  const dotRxR = document.getElementById('dotRxR');
+  const rxTextR = document.getElementById('rxTextR');
+  const rxBtnR = document.getElementById('rxBtnR');
+  const rxOffBtnR = document.getElementById('rxOffBtnR');
+  const radarFrame = document.getElementById('radarFrame');
+  const radarStrength = document.getElementById('radarStrength');
+  const radarPulseEl = document.getElementById('radarPulse');
+  const radarLegend = document.getElementById('radarLegend');
+  const radarDetectList = document.getElementById('radarDetectList');
+  const radarLastDetect = document.getElementById('radarLastDetect');
+
+  let analyserR = null, micStreamR = null, micSourceR = null, rxRunningR = false;
+  let smoothedR = {};
+  CHANNELS.forEach(c => { smoothedR[c.id] = 0; });
+  const blipDotEls = {}, blipLabelEls = {}, legendEls = {};
+
+  const PULSE_PERIOD_MS = 2200; // ソナーのパルスが1回広がる時間（見た目と判定はJSで同じ値を使い同期させる）
+  const PULSE_MAX_RADIUS_PCT = 48; // パルスが広がる最大半径
+  let pulseStartTime = null;
+  let pulseCrossed = false; // このパルス周期で、固定半径をすでに通過したか
+  let lastPulseFrac = 0;
+
+  // CH1を真上(12時方向)、時計回りに60°ずつの「持ち場」を割り当てる（実際の方角ではない）
+  function channelAngle(i){ return i * 60 - 90; }
+  const FIXED_RADIUS_PCT = 40; // 外周付近に固定表示
+
+  // レーダー円の外周にCH1〜6を固定表示（常時見える）。検出中はここが点滅する。
+  function buildRadarBlips(){
+    CHANNELS.forEach((c, i) => {
+      const angleDeg = channelAngle(i);
+      const angleRad = angleDeg * Math.PI / 180;
+      const x = 50 + FIXED_RADIUS_PCT * Math.cos(angleRad);
+      const y = 50 + FIXED_RADIUS_PCT * Math.sin(angleRad);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'blip-wrap';
+      wrap.style.left = x + '%';
+      wrap.style.top = y + '%';
+
+      const dot = document.createElement('div');
+      dot.className = 'blip-dot';
+      const label = document.createElement('div');
+      label.className = 'blip-label';
+      label.textContent = 'CH' + c.id;
+
+      wrap.appendChild(dot);
+      wrap.appendChild(label);
+      radarFrame.appendChild(wrap);
+      blipDotEls[c.id] = dot;
+      blipLabelEls[c.id] = label;
+    });
+  }
+  buildRadarBlips();
+
+  // 凡例（常時表示。CH番号と周波数の対応表 + 点滅で検出中を示す）
+  function buildLegend(){
+    radarLegend.innerHTML = '';
+    CHANNELS.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.textContent = 'CH' + c.id + ' ' + (c.freq/1000).toFixed(1) + 'kHz';
+      radarLegend.appendChild(item);
+      legendEls[c.id] = item;
+    });
+  }
+  buildLegend();
+
+  let recentDetections = []; // {chanId, freq, at}
+  let wasActive = {};
+  CHANNELS.forEach(c => { wasActive[c.id] = false; });
+  const DETECT_HISTORY_MS = 10000; // 検出履歴は10秒で消える
+
+  function addRecentDetection(c){
+    recentDetections.unshift({ chanId:c.id, freq:c.freq, at:Date.now() });
+    recentDetections = recentDetections.slice(0, 6);
+    renderDetectList();
+    log('音レーダー: CH' + c.id + ' (' + c.freq + 'Hz) を検出');
+  }
+  function pruneOldDetections(){
+    const now = Date.now();
+    const before = recentDetections.length;
+    recentDetections = recentDetections.filter(d => now - d.at < DETECT_HISTORY_MS);
+    if(recentDetections.length !== before) renderDetectList();
+  }
+  function renderDetectList(){
+    radarDetectList.innerHTML = '';
+    recentDetections.forEach(d => {
+      const chip = document.createElement('div');
+      chip.className = 'detect-chip';
+      chip.textContent = 'CH' + d.chanId + ' ・ ' + d.freq.toLocaleString() + 'Hz';
+      radarDetectList.appendChild(chip);
+    });
+    if(recentDetections.length === 0){
+      const chip = document.createElement('div');
+      chip.className = 'detect-chip';
+      chip.style.opacity = '.4';
+      chip.style.borderColor = 'var(--line-dim)';
+      chip.style.color = 'var(--text-dim)';
+      chip.textContent = 'まだ検出なし';
+      radarDetectList.appendChild(chip);
+    }
+  }
+  renderDetectList();
+
+  async function startRadar(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      rxTextR.textContent = 'マイクが使用できません（httpsで開いているか確認）';
+      return;
+    }
+    try{
+      micStreamR = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceR = ctx.createMediaStreamSource(micStreamR);
+      analyserR = ctx.createAnalyser();
+      analyserR.fftSize = 8192;
+      micSourceR.connect(analyserR);
+
+      rxRunningR = true;
+      CHANNELS.forEach(c => { smoothedR[c.id] = 0; wasActive[c.id] = false; });
+      pulseCrossed = false;
+      lastPulseFrac = 0;
+      radarStrength.textContent = '0%';
+      recentDetections = [];
+      renderDetectList();
+      radarLastDetect.textContent = 'まだ何も検出していません';
+      pulseStartTime = null;
+      dotRxR.classList.add('on');
+      rxTextR.textContent = '探索中…';
+      rxBtnR.classList.add('hidden');
+      rxOffBtnR.classList.remove('hidden');
+      log('音レーダー: 探索を開始');
+      requestAnimationFrame(tickRadar);
+    } catch(err){
+      rxTextR.textContent = 'エラー: ' + err.message;
+      log('マイク許可の取得に失敗: ' + err.message);
+    }
+  }
+  function stopRadar(){
+    rxRunningR = false;
+    if(micStreamR){ micStreamR.getTracks().forEach(t => t.stop()); micStreamR = null; }
+    if(micSourceR){ micSourceR.disconnect(); micSourceR = null; }
+    analyserR = null;
+    CHANNELS.forEach(c => {
+      clearTimeout(blipDotEls[c.id]._pingTimer);
+      blipDotEls[c.id].classList.remove('ping');
+      blipLabelEls[c.id].classList.remove('ping');
+      legendEls[c.id].classList.remove('active');
+    });
+    dotRxR.classList.remove('on');
+    rxTextR.textContent = '未探索';
+    rxBtnR.classList.remove('hidden');
+    rxOffBtnR.classList.add('hidden');
+    radarPulseEl.style.width = '0%';
+    radarPulseEl.style.height = '0%';
+    radarPulseEl.style.opacity = '0';
+    log('音レーダー: 探索を終了');
+  }
+  rxBtnR.addEventListener('click', startRadar);
+  rxOffBtnR.addEventListener('click', stopRadar);
+
+  // スイープが通過した瞬間だけ、瞬間点灯→ゆっくり消えるピンを起動する
+  function pingChannel(c){
+    const dot = blipDotEls[c.id], label = blipLabelEls[c.id];
+    dot.classList.add('ping');
+    label.classList.add('ping');
+    clearTimeout(dot._pingTimer);
+    dot._pingTimer = setTimeout(() => {
+      dot.classList.remove('ping');
+      label.classList.remove('ping');
+    }, 120); // 一瞬だけ最大輝度にし、その後はbase側の2.2秒トランジションでゆっくり減衰
+    addRecentDetection(c);
+  }
+
+  function tickRadar(ts){
+    if(!rxRunningR || !analyserR) return;
+    if(pulseStartTime === null) pulseStartTime = ts || performance.now();
+    const now = ts || performance.now();
+    const elapsed = (now - pulseStartTime) % PULSE_PERIOD_MS;
+    const frac = elapsed / PULSE_PERIOD_MS;
+    const pulseRadiusPct = frac * PULSE_MAX_RADIUS_PCT;
+
+    // 見た目（幅・不透明度）を判定に使っているのと全く同じ値(pulseRadiusPct / frac)で描画するため、
+    // CSSアニメーションではなくここで直接スタイルを更新する。これにより波と点滅が完全に同期する。
+    radarPulseEl.style.width = (pulseRadiusPct * 2) + '%';
+    radarPulseEl.style.height = (pulseRadiusPct * 2) + '%';
+    radarPulseEl.style.opacity = (0.7 * (1 - frac)).toFixed(3);
+
+    // パルスが一周し終えて次の周期に入ったら、判定フラグをリセット
+    if(frac < lastPulseFrac) pulseCrossed = false;
+    lastPulseFrac = frac;
+
+    pruneOldDetections();
+
+    const data = new Uint8Array(analyserR.frequencyBinCount);
+    analyserR.getByteFrequencyData(data);
+
+    let maxPeakAll = 0;
+    const activeChannelsNow = [];
+    CHANNELS.forEach((c) => {
+      const bin = freqToBin(analyserR, c.freq);
+      let rawPeak = 0;
+      for(let j=Math.max(0,bin-2); j<=bin+2; j++){ if(data[j] > rawPeak) rawPeak = data[j]; }
+      smoothedR[c.id] = decayTo(smoothedR[c.id], rawPeak);
+      const peak = smoothedR[c.id];
+      const active = peak >= SIMUL_THRESHOLD;
+      if(active) activeChannelsNow.push(c);
+      if(peak > maxPeakAll) maxPeakAll = peak;
+
+      // 凡例は「今まさに聞こえているか」をそのまま反映（パルスと無関係、常時リアルタイム）
+      legendEls[c.id].classList.toggle('active', active);
+      wasActive[c.id] = active;
+    });
+
+    // 信号強度は常にリアルタイムで更新（全チャンネルの中で最大の値）
+    radarStrength.textContent = Math.round(Math.min(100, (maxPeakAll/255)*100)) + '%';
+
+    // 広がるパルスの輪が、CHの固定位置（半径）を通過した瞬間に、検出中のCHだけが光る。
+    // このタイミングで「検出できた／できなかった」をまとめて表示メッセージに反映する。
+    if(!pulseCrossed && pulseRadiusPct >= FIXED_RADIUS_PCT){
+      pulseCrossed = true;
+      if(activeChannelsNow.length === 0){
+        radarLastDetect.textContent = 'まだ何も検出していません';
+      } else {
+        radarLastDetect.textContent = '検出中: ' + activeChannelsNow.map(c => 'CH' + c.id).join('、');
+      }
+      activeChannelsNow.forEach(c => pingChannel(c));
+    }
+
+    requestAnimationFrame(tickRadar);
+  }
+
+
+  // ============ 方向スキャン（コンパス＋音の強さ） ============
+  const dirScanBtn = document.getElementById('dirScanBtn');
+  const dirScanOffBtn = document.getElementById('dirScanOffBtn');
+  const compassFrame = document.getElementById('compassFrame');
+  const compassRotor = document.getElementById('compassRotor');
+  const compassBest = document.getElementById('compassBest');
+  const dirCurrentPct = document.getElementById('dirCurrentPct');
+  const dirBestHeading = document.getElementById('dirBestHeading');
+  const dirResetBtn = document.getElementById('dirResetBtn');
+  const ontargetBanner = document.getElementById('ontargetBanner');
+
+  let analyserD = null, micStreamD = null, micSourceD = null, dirRunning = false;
+  let rawHeading = null;      // センサーからの生の方位
+  let currentHeading = null;  // マイク位置補正・キャリブレーション適用後の方位（表示・判定に使用）
+  let rotorAngleUnwrapped = null; // ロータのCSS回転角（0/360をまたいでも飛ばないよう巻き戻さず連続的に扱う）
+
+  // 0°/360°の境界をまたぐときにCSSのtransformが逆回りに大きく飛ぶ（ジャンプする）のを防ぐため、
+  // 直前の角度から見て「最短経路」だけ進めるようにして、連続的な角度値を維持する
+  function unwrapRotate(targetDeg){
+    const target = ((targetDeg % 360) + 360) % 360;
+    if(rotorAngleUnwrapped === null){ rotorAngleUnwrapped = target; return rotorAngleUnwrapped; }
+    const current = ((rotorAngleUnwrapped % 360) + 360) % 360;
+    let delta = target - current;
+    if(delta > 180) delta -= 360;
+    if(delta < -180) delta += 360;
+    rotorAngleUnwrapped += delta;
+    return rotorAngleUnwrapped;
+  }
+
+  let manualOffset = 0;       // キャリブレーションで決まるオフセット（度）。マイクは下側（通話口）についている前提。
+  let bestHeading = null, bestPeakSmoothed = 0;
+  let smoothedD = {};
+  CHANNELS.forEach(c => { smoothedD[c.id] = 0; });
+
+  const calibrateBtn = document.getElementById('calibrateBtn');
+
+  function resetDirRecord(){
+    bestHeading = null; bestPeakSmoothed = 0;
+    compassBest.classList.add('hidden');
+    dirBestHeading.textContent = '--°';
+    ontargetBanner.classList.add('hidden');
+  }
+
+  calibrateBtn.addEventListener('click', () => {
+    if(rawHeading === null){
+      log('キャリブレーション失敗: 方位センサーの値がまだ取得できていません');
+      return;
+    }
+    manualOffset = rawHeading;
+    resetDirRecord();
+    log('キャリブレーション: 現在の向きを正面(0°)として設定しました');
+  });
+
+  // 方位ラベル（N/E/S/W）をロータ内に配置（ロータごと回転することで実際の方位関係を保つ）
+  function buildCompassLabels(){
+    const dirs = [{t:'N', deg:0, cls:'n'}, {t:'E', deg:90}, {t:'S', deg:180}, {t:'W', deg:270}];
+    dirs.forEach(d => {
+      const rad = (d.deg - 90) * Math.PI / 180;
+      const r = 44;
+      const x = 50 + r * Math.cos(rad);
+      const y = 50 + r * Math.sin(rad);
+      const label = document.createElement('div');
+      label.className = 'compass-dir-label' + (d.cls ? ' ' + d.cls : '');
+      label.style.left = x + '%';
+      label.style.top = y + '%';
+      label.textContent = d.t;
+      compassRotor.appendChild(label);
+    });
+  }
+  buildCompassLabels();
+
+  // bestHeadingは絶対方位（磁北基準）で記録するが、表示はロータの回転に任せることで
+  // 「自分は常に正面固定、音の方向が相対的に回って見える」形になる
+  function placeBestMarker(headingDeg){
+    const rad = (headingDeg - 90) * Math.PI / 180;
+    const r = 40;
+    const x = 50 + r * Math.cos(rad);
+    const y = 50 + r * Math.sin(rad);
+    compassBest.style.left = x + '%';
+    compassBest.style.top = y + '%';
+    compassBest.classList.remove('hidden');
+  }
+
+  async function requestCompassPermission(){
+    if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      try{
+        const res = await DeviceOrientationEvent.requestPermission();
+        return res === 'granted';
+      } catch(e){
+        return false;
+      }
+    }
+    return true; // Androidなど、明示的な許可が不要な場合
+  }
+
+  function getHeadingFromEvent(event){
+    if(typeof event.webkitCompassHeading === 'number'){
+      return event.webkitCompassHeading; // iOS Safari: 真北基準の方位が直接取れる
+    }
+    if(typeof event.alpha === 'number'){
+      return (360 - event.alpha) % 360; // Android等の簡易近似（絶対精度は保証されない）
+    }
+    return null;
+  }
+
+  function handleOrientation(event){
+    const h = getHeadingFromEvent(event);
+    if(h !== null){
+      rawHeading = h;
+      currentHeading = ((rawHeading - manualOffset) % 360 + 360) % 360;
+    }
+  }
+
+  async function startDirScan(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      log('マイクが使用できません（httpsで開いているか確認）');
+      return;
+    }
+    const compassOk = await requestCompassPermission();
+    if(!compassOk){
+      log('方位センサーの許可が得られませんでした。方向の記録はできませんが、強さの表示のみ継続します。');
+    }
+
+    try{
+      micStreamD = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceD = ctx.createMediaStreamSource(micStreamD);
+      analyserD = ctx.createAnalyser();
+      analyserD.fftSize = 8192;
+      micSourceD.connect(analyserD);
+
+      const oriEvent = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
+      window.addEventListener(oriEvent, handleOrientation);
+
+      dirRunning = true;
+      CHANNELS.forEach(c => { smoothedD[c.id] = 0; });
+      rotorAngleUnwrapped = null;
+      bestHeading = null; bestPeakSmoothed = 0;
+      compassBest.classList.add('hidden');
+      dirBestHeading.textContent = '--°';
+      ontargetBanner.classList.add('hidden');
+
+      dirScanBtn.classList.add('hidden');
+      dirScanOffBtn.classList.remove('hidden');
+      log('方向スキャンを開始（方位イベント: ' + oriEvent + '）');
+      requestAnimationFrame(tickDirScan);
+    } catch(err){
+      log('マイク許可の取得に失敗: ' + err.message);
+    }
+  }
+
+  function stopDirScan(){
+    dirRunning = false;
+    if(micStreamD){ micStreamD.getTracks().forEach(t => t.stop()); micStreamD = null; }
+    if(micSourceD){ micSourceD.disconnect(); micSourceD = null; }
+    analyserD = null;
+    window.removeEventListener('deviceorientationabsolute', handleOrientation);
+    window.removeEventListener('deviceorientation', handleOrientation);
+    dirScanBtn.classList.remove('hidden');
+    dirScanOffBtn.classList.add('hidden');
+    log('方向スキャンを終了');
+  }
+  dirScanBtn.addEventListener('click', startDirScan);
+  dirScanOffBtn.addEventListener('click', stopDirScan);
+  dirResetBtn.addEventListener('click', () => {
+    resetDirRecord();
+    log('方向スキャンの記録をリセット');
+  });
+
+  function tickDirScan(){
+    if(!dirRunning || !analyserD) return;
+    if(rawHeading !== null){
+      currentHeading = ((rawHeading - manualOffset) % 360 + 360) % 360;
+    }
+    const data = new Uint8Array(analyserD.frequencyBinCount);
+    analyserD.getByteFrequencyData(data);
+
+    let maxPeak = 0;
+    CHANNELS.forEach(c => {
+      const bin = freqToBin(analyserD, c.freq);
+      let rawPeak = 0;
+      for(let i=Math.max(0,bin-2); i<=bin+2; i++){ if(data[i] > rawPeak) rawPeak = data[i]; }
+      smoothedD[c.id] = decayTo(smoothedD[c.id], rawPeak);
+      if(smoothedD[c.id] > maxPeak) maxPeak = smoothedD[c.id];
+    });
+
+    const pct = Math.min(100, (maxPeak/255)*100);
+    dirCurrentPct.textContent = Math.round(pct) + '%';
+
+    if(currentHeading !== null){
+      // ロータ（N/E/S/Wと最強方向マーカー）を逆回転させることで、自分は常に正面固定のまま
+      // 音の方向が相対的に回って見える「自分基準」表示にする。
+      // 0°/360°の境界での逆回転ジャンプを防ぐため、unwrapRotateで連続的な角度に変換する。
+      const rotorDeg = unwrapRotate(-currentHeading);
+      compassRotor.style.transform = 'rotate(' + rotorDeg + 'deg)';
+
+      if(maxPeak > bestPeakSmoothed + 3){ // 微小なノイズでの更新を避けるためのマージン
+        bestPeakSmoothed = maxPeak;
+        bestHeading = currentHeading;
+        placeBestMarker(bestHeading);
+      }
+
+      if(bestHeading !== null){
+        let diff = Math.abs(currentHeading - bestHeading) % 360;
+        if(diff > 180) diff = 360 - diff;
+        let rel = ((bestHeading - currentHeading) % 360 + 360) % 360;
+        dirBestHeading.textContent = Math.round(rel) + '°';
+        ontargetBanner.classList.toggle('hidden', diff > 15);
+      }
+    }
+
+    requestAnimationFrame(tickDirScan);
+  }
+
+  // ============ 音程チャレンジ ============
+  const NOTE_NAMES_JP = { C:'ド', D:'レ', E:'ミ', F:'ファ', G:'ソ', A:'ラ', B:'シ' };
+  const SEMITONE_FROM_C = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const NOTE_SEQUENCE = [
+    {letter:'A',octave:3},{letter:'B',octave:3},
+    {letter:'C',octave:4},{letter:'D',octave:4},{letter:'E',octave:4},{letter:'F',octave:4},{letter:'G',octave:4},{letter:'A',octave:4},{letter:'B',octave:4},
+    {letter:'C',octave:5},{letter:'D',octave:5},{letter:'E',octave:5},{letter:'F',octave:5},{letter:'G',octave:5},{letter:'A',octave:5},
+  ];
+  const NOTE_POOL = NOTE_SEQUENCE.map(n => {
+    const offset = 12*(n.octave-4) + SEMITONE_FROM_C[n.letter] - 9; // A4を基準(0)とした半音数
+    const freq = 440 * Math.pow(2, offset/12);
+    return { name:n.letter+n.octave, jp:NOTE_NAMES_JP[n.letter], freq };
+  });
+
+  const PITCH_QUESTIONS_TOTAL = 5;
+  const PITCH_RECORD_MS = 1500;
+  const PITCH_MIN_HZ = 70, PITCH_MAX_HZ = 1300; // 自己相関の結果として妥当とみなす範囲
+
+  const pitchIntro = document.getElementById('pitchIntro');
+  const pitchQuestion = document.getElementById('pitchQuestion');
+  const pitchResult = document.getElementById('pitchResult');
+  const pitchFinal = document.getElementById('pitchFinal');
+  const pitchStartBtn = document.getElementById('pitchStartBtn');
+  const pitchProgress = document.getElementById('pitchProgress');
+  const noteJp = document.getElementById('noteJp');
+  const noteName = document.getElementById('noteName');
+  const noteFreqEl = document.getElementById('noteFreq');
+  const playExampleBtn = document.getElementById('playExampleBtn');
+  const recordBtn = document.getElementById('recordBtn');
+  const pitchLiveWrap = document.getElementById('pitchLiveWrap');
+  const pitchLiveVal = document.getElementById('pitchLiveVal');
+  const pitchCountdown = document.getElementById('pitchCountdown');
+  const pitchScoreVal = document.getElementById('pitchScoreVal');
+  const pitchFeedback = document.getElementById('pitchFeedback');
+  const pitchRetryBtn = document.getElementById('pitchRetryBtn');
+  const pitchNextBtn = document.getElementById('pitchNextBtn');
+  const pitchTotalScore = document.getElementById('pitchTotalScore');
+  const pitchBreakdown = document.getElementById('pitchBreakdown');
+  const pitchRestartBtn = document.getElementById('pitchRestartBtn');
+
+  let pitchQueue = [];
+  let pitchIndex = 0;
+  let pitchResults = []; // {note, score, sungFreq, feedback}
+  let analyserP = null, micStreamP = null, micSourceP = null;
+  let pitchRecording = false;
+  let pitchIntervalId = null;
+
+  function pickPitchQuestions(){
+    const pool = NOTE_POOL.slice();
+    for(let i=pool.length-1; i>0; i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    return pool.slice(0, PITCH_QUESTIONS_TOTAL);
+  }
+
+  function renderPitchProgress(){
+    pitchProgress.innerHTML = '';
+    for(let i=0;i<PITCH_QUESTIONS_TOTAL;i++){
+      const d = document.createElement('div');
+      d.className = 'pdot' + (i < pitchIndex ? ' done' : (i === pitchIndex ? ' current' : ''));
+      pitchProgress.appendChild(d);
+    }
+  }
+
+  pitchStartBtn.addEventListener('click', () => {
+    pitchQueue = pickPitchQuestions();
+    pitchIndex = 0;
+    pitchResults = [];
+    showQuestion();
+  });
+  pitchRestartBtn.addEventListener('click', () => {
+    pitchQueue = pickPitchQuestions();
+    pitchIndex = 0;
+    pitchResults = [];
+    showQuestion();
+  });
+
+  function showQuestion(){
+    pitchIntro.classList.add('hidden');
+    pitchResult.classList.add('hidden');
+    pitchFinal.classList.add('hidden');
+    pitchQuestion.classList.remove('hidden');
+    renderPitchProgress();
+
+    const note = pitchQueue[pitchIndex];
+    noteJp.textContent = note.jp;
+    noteName.textContent = note.name;
+    noteFreqEl.textContent = note.freq.toFixed(1) + ' Hz';
+
+    pitchLiveWrap.classList.add('hidden');
+    pitchCountdown.classList.add('hidden');
+    recordBtn.classList.remove('hidden');
+    recordBtn.disabled = false;
+    log('音程チャレンジ: 第' + (pitchIndex+1) + '問 ' + note.name + '（' + note.jp + '） ' + note.freq.toFixed(1) + 'Hz');
+  }
+
+  playExampleBtn.addEventListener('click', () => {
+    const note = pitchQueue[pitchIndex];
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = note.freq;
+    gain.gain.value = 0;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+
+    // 人の耳は同じ音量(振幅)でも周波数によって聞こえ方の大きさが違う（等ラウドネス曲線）。
+    // 440Hzを基準に、低い音は少し大きく・高い音は少し控えめに補正して聞こえ方を揃える。
+    const compensation = Math.pow(440 / note.freq, 0.5);
+    const targetGain = Math.min(0.9, Math.max(0.35, 0.6 * compensation));
+
+    gain.gain.linearRampToValueAtTime(targetGain, ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(targetGain, ctx.currentTime + 1.3);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.6);
+    setTimeout(() => { try{ osc.stop(); osc.disconnect(); gain.disconnect(); }catch(e){} }, 1700);
+  });
+
+  // 自己相関法によるピッチ検出（時間波形から基本周波数を推定する）
+  function autoCorrelate(buf, sampleRate){
+    const SIZE = buf.length;
+    let rms = 0;
+    for(let i=0;i<SIZE;i++){ rms += buf[i]*buf[i]; }
+    rms = Math.sqrt(rms/SIZE);
+    if(rms < 0.01) return -1; // 無音とみなす
+
+    let r1=0, r2=SIZE-1;
+    const thres = 0.2;
+    for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i]) < thres){ r1=i; break; } }
+    for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i]) < thres){ r2=SIZE-i; break; } }
+    const trimmed = buf.slice(r1, r2);
+    const newSize = trimmed.length;
+    if(newSize < 8) return -1;
+
+    const c = new Array(newSize).fill(0);
+    for(let i=0;i<newSize;i++){
+      for(let j=0;j<newSize-i;j++){ c[i] += trimmed[j]*trimmed[j+i]; }
+    }
+    let d = 0;
+    while(d < newSize-1 && c[d] > c[d+1]) d++;
+    let maxVal=-1, maxPos=-1;
+    for(let i=d;i<newSize;i++){ if(c[i] > maxVal){ maxVal=c[i]; maxPos=i; } }
+    if(maxPos <= 0) return -1;
+
+    let T0 = maxPos;
+    const x1=c[T0-1]||0, x2=c[T0]||0, x3=c[T0+1]||0;
+    const a=(x1+x3-2*x2)/2, b=(x3-x1)/2;
+    if(a) T0 = T0 - b/(2*a);
+    if(T0 <= 0) return -1;
+    return sampleRate / T0;
+  }
+
+  recordBtn.addEventListener('click', startPitchRecording);
+
+  async function startPitchRecording(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      log('マイクが使用できません（httpsで開いているか確認）');
+      return;
+    }
+    try{
+      if(!analyserP){
+        micStreamP = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+        const ctx = getAudioCtx();
+        micSourceP = ctx.createMediaStreamSource(micStreamP);
+        analyserP = ctx.createAnalyser();
+        analyserP.fftSize = 2048;
+        micSourceP.connect(analyserP);
+      }
+    } catch(err){
+      log('マイク許可の取得に失敗: ' + err.message);
+      return;
+    }
+
+    recordBtn.disabled = true;
+    pitchLiveWrap.classList.remove('hidden');
+    pitchCountdown.classList.remove('hidden');
+    pitchRecording = true;
+
+    const samples = [];
+    const startTime = Date.now();
+    const buf = new Float32Array(analyserP.fftSize);
+
+    pitchIntervalId = setInterval(() => {
+      analyserP.getFloatTimeDomainData(buf);
+      const freq = autoCorrelate(buf, getAudioCtx().sampleRate);
+      if(freq > 0 && freq >= PITCH_MIN_HZ && freq <= PITCH_MAX_HZ){
+        samples.push(freq);
+        pitchLiveVal.textContent = Math.round(freq) + ' Hz';
+      }
+      const elapsed = Date.now() - startTime;
+      const remain = Math.max(0, Math.ceil((PITCH_RECORD_MS - elapsed)/1000));
+      pitchCountdown.textContent = '残り ' + remain + ' 秒…声を伸ばして！';
+
+      if(elapsed >= PITCH_RECORD_MS){
+        clearInterval(pitchIntervalId);
+        pitchRecording = false;
+        finishPitchRecording(samples);
+      }
+    }, 100);
+  }
+
+  function stopPitchMic(){
+    if(pitchIntervalId){ clearInterval(pitchIntervalId); pitchIntervalId = null; }
+    if(micStreamP){ micStreamP.getTracks().forEach(t => t.stop()); micStreamP = null; }
+    if(micSourceP){ micSourceP.disconnect(); micSourceP = null; }
+    analyserP = null;
+  }
+
+  function scorePitch(sungFreq, targetFreq){
+    const cents = 1200 * Math.log2(sungFreq / targetFreq);
+    const octaveShift = Math.round(cents / 1200);
+    const pitchClassCents = cents - 1200*octaveShift; // -600〜+600
+    let base = Math.max(0, 100 - (Math.abs(pitchClassCents)/100)*100);
+    base = Math.round(base);
+    if(octaveShift !== 0 && base > 0){
+      base = Math.round(base * 0.6); // オクターブ違いは軽めの減点にとどめる
+    }
+    return { score: base, pitchClassCents, octaveShift };
+  }
+
+  function finishPitchRecording(samples){
+    pitchLiveWrap.classList.add('hidden');
+    pitchCountdown.classList.add('hidden');
+    pitchQuestion.classList.add('hidden');
+    pitchResult.classList.remove('hidden');
+
+    const note = pitchQueue[pitchIndex];
+
+    if(samples.length === 0){
+      pitchScoreVal.innerHTML = '0<span style="font-size:16px;color:var(--text-dim);"> / 100点</span>';
+      pitchFeedback.textContent = '声が検出できませんでした。マイクに向かってもう少し大きな声で歌ってみてください。';
+      pitchRetryBtn.classList.remove('hidden');
+      pitchNextBtn.classList.add('hidden');
+      log('第' + (pitchIndex+1) + '問: 声が検出できませんでした');
+      return;
+    }
+
+    const sorted = samples.slice().sort((a,b) => a-b);
+    const sungFreq = sorted[Math.floor(sorted.length/2)]; // 中央値（外れ値に強い）
+    const result = scorePitch(sungFreq, note.freq);
+
+    let feedback;
+    if(result.octaveShift !== 0 && result.score > 0){
+      feedback = '音名は合っています！ただしオクターブが違いました（少し減点）。';
+    } else if(result.score >= 90){
+      feedback = 'ほぼ完璧！とても近い音程でした。';
+    } else if(result.score >= 60){
+      feedback = '近い音でした。あと少し！';
+    } else if(result.score > 0){
+      feedback = '音がズレていました。';
+    } else {
+      feedback = '残念、目標の音とは大きく違いました。';
+    }
+
+    pitchScoreVal.innerHTML = result.score + '<span style="font-size:16px;color:var(--text-dim);"> / 100点</span>';
+    pitchFeedback.textContent = feedback + '（あなたの声: 約' + Math.round(sungFreq) + 'Hz）';
+    pitchRetryBtn.classList.remove('hidden');
+    pitchNextBtn.classList.remove('hidden');
+
+    pitchResults[pitchIndex] = { note, score: result.score, sungFreq, feedback };
+    log('第' + (pitchIndex+1) + '問: ' + note.name + ' → ' + Math.round(sungFreq) + 'Hz、' + result.score + '点');
+  }
+
+  pitchRetryBtn.addEventListener('click', () => {
+    pitchResult.classList.add('hidden');
+    pitchQuestion.classList.remove('hidden');
+    recordBtn.disabled = false;
+  });
+
+  pitchNextBtn.addEventListener('click', () => {
+    pitchIndex++;
+    if(pitchIndex >= PITCH_QUESTIONS_TOTAL){
+      showPitchFinal();
+    } else {
+      showQuestion();
+    }
+  });
+
+  function showPitchFinal(){
+    pitchResult.classList.add('hidden');
+    pitchFinal.classList.remove('hidden');
+    stopPitchMic();
+
+    const total = pitchResults.reduce((sum, r) => sum + (r ? r.score : 0), 0);
+    pitchTotalScore.textContent = '合計スコア: ' + total + ' / ' + (PITCH_QUESTIONS_TOTAL*100) + '点';
+
+    pitchBreakdown.innerHTML = '';
+    pitchResults.forEach((r, i) => {
+      if(!r) return;
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<span>第' + (i+1) + '問　' + r.note.name + '（' + r.note.jp + '）</span><b>' + r.score + '点</b>';
+      pitchBreakdown.appendChild(row);
+    });
+
+    showToast('音程チャレンジ完了', '合計 ' + total + ' / ' + (PITCH_QUESTIONS_TOTAL*100) + '点');
+    log('🏆 音程チャレンジ終了: 合計 ' + total + '点');
+  }
+})();
+</script>
+</body>
+</html>
