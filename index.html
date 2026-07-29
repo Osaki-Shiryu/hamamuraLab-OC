@@ -267,6 +267,28 @@
   }
   .comm-card .big{ font-size:34px; margin-bottom:10px; }
 
+  /* ============ 音声モデム ============ */
+  .modem-bits{ display:flex; gap:6px; margin-top:14px; justify-content:center; }
+  .modem-bit{
+    width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:700; font-size:15px;
+    background:var(--bg-panel); border:1px solid var(--line-dim); color:var(--text-dim);
+  }
+  .modem-bit.on{ background:#0f261f; border-color:var(--sig-green); color:var(--sig-green); }
+  .modem-bit.off{ background:#1a1004; border-color:var(--sig-amber); color:var(--sig-amber); }
+  .modem-bit.active{ transform:scale(1.15); }
+
+  .modem-energy-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .modem-energy-label{ width:76px; font-family:var(--font-display); font-size:11px; color:var(--text-dim); flex-shrink:0; }
+  .modem-energy-track{ flex:1; height:14px; background:#0a1a15; border-radius:7px; overflow:hidden; border:1px solid var(--line-dim); }
+  .modem-energy-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--sig-teal), var(--sig-green)); transition:width .1s ease; }
+
+  .modem-received{
+    margin-top:14px; font-family:var(--font-display); font-size:20px; letter-spacing:.1em;
+    text-align:center; padding:14px; border-radius:10px; background:var(--bg-panel); border:1px solid var(--line-dim);
+    min-height:26px; color:var(--sig-green);
+  }
+
   .log{ margin-top:16px; font-family:var(--font-display); font-size:11px; color:var(--text-dim); max-height:110px; overflow-y:auto; line-height:1.8; }
   .log div span{ color:var(--sig-teal); }
 
@@ -604,14 +626,129 @@
   </div><!-- /worldSound -->
 
   <div id="worldComm" class="hidden">
-    <div class="comm-card">
-      <div class="big">📡</div>
-      <b>通信シミュレーション（準備中）</b><br><br>
-      ここに、ディジタル無線通信の考え方を体験できるシミュレーションを追加していく予定です。<br>
-      候補：変調方式の聞き比べ、誤り訂正符号（ハミング符号）パズル、周波数分割多元接続（FDMA）の陣取りゲーム、
-      シャノン限界を体感するチャレンジ　など。<br><br>
-      どれから作るか、一緒に決めましょう。
+
+    <!-- 通信メニュー -->
+    <div id="commRoleSelect">
+      <div class="role-grid">
+        <div class="role-card seek" id="pickSR">
+          <div class="big">🔬</div>
+          <div><div class="ttl">確率共鳴シミュレーター</div>
+          <div class="desc">ノイズを足すと、逆に弱い信号が見つけやすくなる不思議な現象を体験</div></div>
+        </div>
+        <div class="role-card seek" id="pickModem">
+          <div class="big">📶</div>
+          <div><div class="ttl">音声モデム（実験的）</div>
+          <div class="desc">数値を2進数に変換し、音の高さの切り替え（FSK変調）で実際に送受信する</div></div>
+        </div>
+        <div class="role-card" style="opacity:.4; cursor:default;">
+          <div class="big">🧩</div>
+          <div><div class="ttl">準備中</div>
+          <div class="desc">誤り訂正・多元接続など、他のシミュレーションも追加予定</div></div>
+        </div>
+      </div>
     </div>
+
+    <!-- 確率共鳴シミュレーター -->
+    <div class="panel hidden" id="srPanel">
+      <div class="chan-title" style="margin-top:0;">確率共鳴シミュレーター</div>
+      <div class="sub" style="margin-top:0; text-align:left;">
+        点線は「本当は存在する弱い周期信号」です。これだけでは閾値(赤い点線)を超えないため検出できません。
+        ノイズを足すと、信号がノイズに押し上げられて閾値を周期的に超えるようになり、逆に検出しやすくなることがあります。
+      </div>
+      <div class="notice">
+        <b>確率共鳴（Stochastic Resonance）とは：</b> 弱すぎて閾値を超えない周期信号に、あえてノイズを加えることで
+        検出しやすくなる現象です。ノイズが少なすぎても効果はなく、多すぎても信号がノイズに埋もれてしまいます。
+        「ちょうどいいノイズの強さ」が存在するのがポイントです。
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="chan-title" style="margin-bottom:6px;">ノイズ強度　σ = <span id="srSigmaVal">0.00</span></div>
+        <input type="range" id="srSigmaSlider" min="0" max="200" value="0" style="width:100%;">
+      </div>
+
+      <svg id="srTimeSvg" viewBox="0 0 400 170" style="width:100%; margin-top:14px; background:#0a1a15; border:1px solid var(--line-dim); border-radius:10px; display:block;"></svg>
+      <div class="sub" style="text-align:left; margin-top:6px;">
+        <span style="color:var(--sig-teal);">■</span> 隠れた弱い信号　
+        <span style="color:var(--text-main);">■</span> ノイズが乗った実際の信号　
+        <span style="color:var(--sig-red);">- -</span> 閾値　
+        <span style="color:var(--sig-green);">●</span> 検出された瞬間
+      </div>
+
+      <div class="stats" style="margin-top:14px;">
+        <div class="stat"><div class="num" id="srScoreVal">0</div><div class="lbl">検出しやすさスコア（0〜100）</div></div>
+      </div>
+
+      <div class="chan-title">ノイズ強度と検出しやすさの関係</div>
+      <svg id="srCurveSvg" viewBox="0 0 400 170" style="width:100%; background:#0a1a15; border:1px solid var(--line-dim); border-radius:10px; display:block;"></svg>
+      <div class="sub" style="text-align:left; margin-top:6px;">
+        グラフの山（ピーク）が「検出に最適なノイズの強さ」です。スライダーを動かして、
+        山の頂上あたりで検出しやすさスコアが一番高くなることを確かめてみましょう。
+      </div>
+
+      <button class="act btn-back" id="srBack">通信メニューに戻る</button>
+    </div>
+
+    <!-- 音声モデム -->
+    <div class="panel hidden" id="modemPanel">
+      <div class="chan-title" style="margin-top:0;">音声モデム（実験的）</div>
+      <div class="sub" style="margin-top:0; text-align:left;">
+        数値を8bitの2進数に変換し、音の高さの切り替え（周波数偏移変調・FSK）で実際に送受信します。
+        2台のスマホで「送信」「受信」役を分けて試してみましょう。
+      </div>
+      <div class="notice">
+        <b>使うトーン：</b> 同期音(プリアンブル) 1000Hz／ビット0 = 1400Hz／ビット1 = 1800Hz。
+        1ビットあたり250ms。周囲が静かな場所・スマホの音量を上げた状態で試してください。
+      </div>
+
+      <div class="role-grid">
+        <div class="role-card host" id="pickModemTx">
+          <div class="big">📤</div>
+          <div><div class="ttl">送信</div><div class="desc">数値を選んで音で送る</div></div>
+        </div>
+        <div class="role-card seek" id="pickModemRx">
+          <div class="big">📥</div>
+          <div><div class="ttl">受信</div><div class="desc">マイクで聞き取って復号する</div></div>
+        </div>
+      </div>
+
+      <!-- 送信 -->
+      <div class="panel hidden" id="modemTxPanel" style="margin-top:16px;">
+        <div class="chan-title" style="margin-top:0;">送る数値を選ぶ（0〜255）</div>
+        <input type="range" id="modemValueSlider" min="0" max="255" value="42" style="width:100%;">
+        <div style="text-align:center; margin-top:8px;">
+          <div style="font-family:var(--font-display); font-size:28px; color:var(--sig-teal);" id="modemValueDisplay">42</div>
+          <div style="font-family:var(--font-display); font-size:13px; color:var(--text-dim);">2進数: <span id="modemBinaryDisplay">00101010</span></div>
+        </div>
+
+        <div class="modem-bits" id="modemTxBits"></div>
+
+        <button class="act btn-host" id="modemSendBtn">🔊 この数値を送信する</button>
+        <button class="act btn-back" id="modemTxBack">戻る</button>
+      </div>
+
+      <!-- 受信 -->
+      <div class="panel hidden" id="modemRxPanel" style="margin-top:16px;">
+        <div class="status-row"><div class="dot" id="dotRxM"></div><div class="status-text" id="rxTextM">未受信</div></div>
+        <button class="act btn-seek" id="rxBtnM">受信開始</button>
+        <button class="act btn-off hidden" id="rxOffBtnM">受信終了</button>
+
+        <div style="margin-top:16px;">
+          <div class="modem-energy-row"><div class="modem-energy-label">同期音</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillPreamble"></div></div></div>
+          <div class="modem-energy-row"><div class="modem-energy-label">ビット0</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillBit0"></div></div></div>
+          <div class="modem-energy-row"><div class="modem-energy-label">ビット1</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillBit1"></div></div></div>
+        </div>
+
+        <div class="modem-bits" id="modemRxBits"></div>
+
+        <div class="modem-received" id="modemReceivedVal">受信待ち…</div>
+
+        <button class="act btn-back" id="modemRxReset">受信をリセット</button>
+        <button class="act btn-back" id="modemRxBack">戻る</button>
+      </div>
+
+      <button class="act btn-back" id="modemBack" style="margin-top:16px;">通信メニューに戻る</button>
+    </div>
+
   </div>
 
   <footer>Web Audio API (OscillatorNode / AnalyserNode) を使用。Bluetoothは使用していません。</footer>
@@ -696,6 +833,54 @@
   const tabComm = document.getElementById('tabComm');
   const worldSound = document.getElementById('worldSound');
   const worldComm = document.getElementById('worldComm');
+  const commRoleSelect = document.getElementById('commRoleSelect');
+  const pickSR = document.getElementById('pickSR');
+  const srPanel = document.getElementById('srPanel');
+  const srBack = document.getElementById('srBack');
+  const pickModem = document.getElementById('pickModem');
+  const modemPanel = document.getElementById('modemPanel');
+  const modemBack = document.getElementById('modemBack');
+  const pickModemTx = document.getElementById('pickModemTx');
+  const pickModemRx = document.getElementById('pickModemRx');
+  const modemTxPanel = document.getElementById('modemTxPanel');
+  const modemRxPanel = document.getElementById('modemRxPanel');
+  const modemTxBack = document.getElementById('modemTxBack');
+  const modemRxBack = document.getElementById('modemRxBack');
+
+  pickSR.addEventListener('click', () => {
+    commRoleSelect.classList.add('hidden');
+    srPanel.classList.remove('hidden');
+    initSR();
+  });
+  srBack.addEventListener('click', () => {
+    srPanel.classList.add('hidden');
+    commRoleSelect.classList.remove('hidden');
+  });
+
+  pickModem.addEventListener('click', () => {
+    commRoleSelect.classList.add('hidden');
+    modemPanel.classList.remove('hidden');
+  });
+  modemBack.addEventListener('click', () => {
+    stopModemRx();
+    modemTxPanel.classList.add('hidden');
+    modemRxPanel.classList.add('hidden');
+    modemPanel.classList.add('hidden');
+    commRoleSelect.classList.remove('hidden');
+  });
+  pickModemTx.addEventListener('click', () => {
+    modemTxPanel.classList.remove('hidden');
+    modemRxPanel.classList.add('hidden');
+    renderModemTxBits();
+  });
+  pickModemRx.addEventListener('click', () => {
+    modemRxPanel.classList.remove('hidden');
+    modemTxPanel.classList.add('hidden');
+    renderModemRxBits();
+  });
+  modemTxBack.addEventListener('click', () => { modemTxPanel.classList.add('hidden'); });
+  modemRxBack.addEventListener('click', () => { stopModemRx(); modemRxPanel.classList.add('hidden'); });
+
 
   function stopAllSoundAudio(){
     stopOscillator();
@@ -711,6 +896,7 @@
     tabComm.classList.remove('active');
     worldSound.classList.remove('hidden');
     worldComm.classList.add('hidden');
+    stopModemRx();
   });
   tabComm.addEventListener('click', () => {
     tabComm.classList.add('active');
@@ -719,6 +905,10 @@
     worldSound.classList.add('hidden');
     stopAllSoundAudio();
     showPanel(roleSelect); // 次に「音」タブに戻ったときメインメニューから始まるようにする
+    commRoleSelect.classList.remove('hidden');
+    srPanel.classList.add('hidden');
+    modemPanel.classList.add('hidden');
+    stopModemRx();
   });
 
   pickHost.addEventListener('click', () => showPanel(hostPanel));
@@ -1832,14 +2022,15 @@
       return;
     }
     try{
-      if(!analyserP){
-        micStreamP = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
-        const ctx = getAudioCtx();
-        micSourceP = ctx.createMediaStreamSource(micStreamP);
-        analyserP = ctx.createAnalyser();
-        analyserP.fftSize = 2048;
-        micSourceP.connect(analyserP);
-      }
+      // 録音のたびに毎回マイクを取得し直す。つなぎっぱなしにすると、iOSで
+      // オーディオの出力先が通話用の小さいスピーカーに切り替わってしまい、
+      // 以降「お手本」の音まで小さくなってしまうため、使い終わったら都度切断する。
+      micStreamP = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceP = ctx.createMediaStreamSource(micStreamP);
+      analyserP = ctx.createAnalyser();
+      analyserP.fftSize = 2048;
+      micSourceP.connect(analyserP);
     } catch(err){
       log('マイク許可の取得に失敗: ' + err.message);
       return;
@@ -1893,6 +2084,9 @@
   }
 
   function finishPitchRecording(samples){
+    // 録音が終わったらすぐにマイクを切断する（iOSでのスピーカー出力の切り替わりを防ぐため）
+    stopPitchMic();
+
     pitchLiveWrap.classList.add('hidden');
     pitchCountdown.classList.add('hidden');
     pitchQuestion.classList.add('hidden');
@@ -1969,6 +2163,390 @@
 
     showToast('音程チャレンジ完了', '合計 ' + total + ' / ' + (PITCH_QUESTIONS_TOTAL*100) + '点');
     log('🏆 音程チャレンジ終了: 合計 ' + total + '点');
+  }
+
+  // ============ 確率共鳴（Stochastic Resonance）シミュレーター ============
+  const SR_F_PERIODS_METRIC = 16; // 検出しやすさスコア計算に使う周期数（多いほど安定）
+  const SR_N_METRIC = 800;        // 上記に使うサンプル数
+  const SR_TRIALS_CURVE = 6;      // カーブ計算時に平均する試行回数
+  const SR_TRIALS_LIVE = 10;      // スライダー操作時のスコア表示に使う試行回数（安定性重視）
+  const SR_PERIODS_VIEW = 4;      // 時間波形表示に使う周期数
+  const SR_N_VIEW = 220;          // 時間波形表示のサンプル数
+  const SR_AMPLITUDE = 0.4;       // 隠れた弱い信号の振幅（閾値より小さい）
+  const SR_THRESHOLD = 1.0;       // 検出の閾値
+  const SR_SIGMA_MAX = 2.0;       // スライダーが取り得る最大ノイズ強度
+  const SR_CURVE_STEPS = 50;      // カーブのプロット点数
+
+  let srInitialized = false;
+  let srCurveData = []; // [{sigma, score0to100}]
+  let srMaxMetric = 1;
+
+  function gaussianRandom(){
+    let u=0, v=0;
+    while(u===0) u = Math.random();
+    while(v===0) v = Math.random();
+    return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+  }
+
+  // 一定時間ぶんの「隠れ信号・ノイズ入り信号・閾値検出結果」を生成する
+  function generateSRSeries(sigma, periods, N){
+    const ts=[], s=[], x=[], y=[];
+    for(let i=0;i<N;i++){
+      const t = (i/N) * periods;
+      const angle = 2*Math.PI*t;
+      const sig = SR_AMPLITUDE * Math.sin(angle);
+      const noise = sigma * gaussianRandom();
+      const val = sig + noise;
+      ts.push(t); s.push(sig); x.push(val); y.push(val > SR_THRESHOLD ? 1 : 0);
+    }
+    return { ts, s, x, y };
+  }
+
+  // 閾値検出結果 y(t) が、信号の周波数成分をどれだけ含むかを測る（検出しやすさの指標）
+  function computeSRMetric(sigma, periods, N, trials){
+    let total = 0;
+    for(let tr=0; tr<trials; tr++){
+      let sumSin=0, sumCos=0;
+      for(let i=0;i<N;i++){
+        const t = (i/N) * periods;
+        const angle = 2*Math.PI*t;
+        const sig = SR_AMPLITUDE * Math.sin(angle);
+        const noise = sigma * gaussianRandom();
+        const val = sig + noise;
+        const yv = val > SR_THRESHOLD ? 1 : 0;
+        sumSin += yv * Math.sin(angle);
+        sumCos += yv * Math.cos(angle);
+      }
+      total += (sumSin*sumSin + sumCos*sumCos) / (N*N);
+    }
+    return total / trials;
+  }
+
+  function buildSRCurve(){
+    srCurveData = [];
+    srMaxMetric = 1e-9;
+    for(let i=0;i<=SR_CURVE_STEPS;i++){
+      const sigma = (i/SR_CURVE_STEPS) * SR_SIGMA_MAX;
+      const metric = computeSRMetric(sigma, SR_F_PERIODS_METRIC, SR_N_METRIC, SR_TRIALS_CURVE);
+      srCurveData.push({ sigma, metric });
+      if(metric > srMaxMetric) srMaxMetric = metric;
+    }
+  }
+
+  function metricToScore(metric){
+    return Math.max(0, Math.min(100, Math.round((metric / srMaxMetric) * 100)));
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs){
+    const el = document.createElementNS(SVG_NS, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  function drawSRTime(sigma){
+    const svg = document.getElementById('srTimeSvg');
+    svg.innerHTML = '';
+    const W=400, H=170, PAD=10;
+    const data = generateSRSeries(sigma, SR_PERIODS_VIEW, SR_N_VIEW);
+
+    // 表示レンジは信号+ノイズの想定最大値に合わせて固定（見た目のブレを抑える）
+    const yMax = 1.2 + SR_SIGMA_MAX*3.2;
+    const yMin = -yMax;
+    const xOf = i => PAD + (i/(SR_N_VIEW-1)) * (W-2*PAD);
+    const yOf = v => H/2 - (v/yMax) * (H/2-PAD);
+
+    // 閾値の点線
+    const thY = yOf(SR_THRESHOLD);
+    svg.appendChild(svgEl('line', {x1:PAD, y1:thY, x2:W-PAD, y2:thY, stroke:'#ff5d6c', 'stroke-width':1, 'stroke-dasharray':'4,3'}));
+    // 中心線(0)
+    svg.appendChild(svgEl('line', {x1:PAD, y1:H/2, x2:W-PAD, y2:H/2, stroke:'#1c3a30', 'stroke-width':1}));
+
+    // 隠れた弱い信号（点線・teal）
+    let dS = '';
+    data.s.forEach((v,i) => { dS += (i===0?'M':'L') + xOf(i) + ',' + yOf(v) + ' '; });
+    svg.appendChild(svgEl('path', {d:dS, fill:'none', stroke:'#4fe8c8', 'stroke-width':1.5, 'stroke-dasharray':'3,3', opacity:'0.9'}));
+
+    // ノイズが乗った実際の信号（実線・白系）
+    let dX = '';
+    data.x.forEach((v,i) => { dX += (i===0?'M':'L') + xOf(i) + ',' + yOf(v) + ' '; });
+    svg.appendChild(svgEl('path', {d:dX, fill:'none', stroke:'#e6fff6', 'stroke-width':1.3, opacity:'0.85'}));
+
+    // 検出された瞬間（緑の点、閾値のライン上に表示）
+    data.y.forEach((yv,i) => {
+      if(yv > 0){
+        svg.appendChild(svgEl('circle', {cx:xOf(i), cy:thY, r:2.4, fill:'#5bffa8'}));
+      }
+    });
+  }
+
+  function drawSRCurve(currentSigma){
+    const svg = document.getElementById('srCurveSvg');
+    svg.innerHTML = '';
+    const W=400, H=170, PADL=28, PADR=10, PADT=12, PADB=22;
+    const xOf = sigma => PADL + (sigma/SR_SIGMA_MAX) * (W-PADL-PADR);
+    const yOf = score => (H-PADB) - (score/100) * (H-PADB-PADT);
+
+    // 軸
+    svg.appendChild(svgEl('line', {x1:PADL, y1:H-PADB, x2:W-PADR, y2:H-PADB, stroke:'#1c3a30', 'stroke-width':1}));
+    svg.appendChild(svgEl('line', {x1:PADL, y1:PADT, x2:PADL, y2:H-PADB, stroke:'#1c3a30', 'stroke-width':1}));
+
+    // カーブ本体
+    let d = '';
+    srCurveData.forEach((p,i) => {
+      const score = metricToScore(p.metric);
+      d += (i===0?'M':'L') + xOf(p.sigma) + ',' + yOf(score) + ' ';
+    });
+    svg.appendChild(svgEl('path', {d, fill:'none', stroke:'#4fe8c8', 'stroke-width':2}));
+
+    // 現在位置のマーカー
+    const nearest = srCurveData.reduce((a,b) => Math.abs(b.sigma-currentSigma) < Math.abs(a.sigma-currentSigma) ? b : a);
+    const curScore = metricToScore(nearest.metric);
+    svg.appendChild(svgEl('line', {x1:xOf(currentSigma), y1:PADT, x2:xOf(currentSigma), y2:H-PADB, stroke:'#ffb454', 'stroke-width':1, 'stroke-dasharray':'3,3'}));
+    svg.appendChild(svgEl('circle', {cx:xOf(currentSigma), cy:yOf(curScore), r:4.5, fill:'#ffb454'}));
+
+    // 軸ラベル
+    const lbl1 = svgEl('text', {x:PADL, y:H-6, fill:'#5f9484', 'font-size':'9'}); lbl1.textContent = 'σ=0';
+    const lbl2 = svgEl('text', {x:W-PADR-30, y:H-6, fill:'#5f9484', 'font-size':'9'}); lbl2.textContent = 'σ=' + SR_SIGMA_MAX.toFixed(1);
+    svg.appendChild(lbl1); svg.appendChild(lbl2);
+  }
+
+  const srSigmaSlider = document.getElementById('srSigmaSlider');
+  const srSigmaVal = document.getElementById('srSigmaVal');
+  const srScoreVal = document.getElementById('srScoreVal');
+
+  function updateSRDisplay(){
+    const sigma = (srSigmaSlider.value/200) * SR_SIGMA_MAX;
+    srSigmaVal.textContent = sigma.toFixed(2);
+    drawSRTime(sigma);
+    const metric = computeSRMetric(sigma, SR_F_PERIODS_METRIC, SR_N_METRIC, SR_TRIALS_LIVE);
+    srScoreVal.textContent = metricToScore(metric);
+    drawSRCurve(sigma);
+  }
+
+  srSigmaSlider.addEventListener('input', updateSRDisplay);
+
+  function initSR(){
+    if(!srInitialized){
+      buildSRCurve();
+      srInitialized = true;
+      log('確率共鳴シミュレーター: カーブを計算しました');
+    }
+    updateSRDisplay();
+  }
+
+  // ============ 音声モデム（FSKで実際にビットを送受信する） ============
+  const MODEM_PREAMBLE_FREQ = 1000;
+  const MODEM_BIT0_FREQ = 1400;
+  const MODEM_BIT1_FREQ = 1800;
+  const MODEM_BIT_MS = 250;
+  const MODEM_PREAMBLE_MS = 300;
+  const MODEM_BITS = 8;
+  const MODEM_DETECT_THRESHOLD = 120; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
+
+  function playModemTone(freq, startTime, durationSec, gainLevel){
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainLevel, startTime + 0.01);
+    gain.gain.setValueAtTime(gainLevel, Math.max(startTime + 0.01, startTime + durationSec - 0.015));
+    gain.gain.linearRampToValueAtTime(0, startTime + durationSec);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + durationSec + 0.03);
+    setTimeout(() => { try{ osc.disconnect(); gain.disconnect(); }catch(e){} }, (durationSec+0.1)*1000 + 200);
+  }
+
+  const modemValueSlider = document.getElementById('modemValueSlider');
+  const modemValueDisplay = document.getElementById('modemValueDisplay');
+  const modemBinaryDisplay = document.getElementById('modemBinaryDisplay');
+  const modemTxBits = document.getElementById('modemTxBits');
+  const modemSendBtn = document.getElementById('modemSendBtn');
+
+  function valueToBits(value){
+    return value.toString(2).padStart(MODEM_BITS, '0').split('').map(Number);
+  }
+
+  function renderModemTxBits(){
+    const value = parseInt(modemValueSlider.value, 10);
+    modemValueDisplay.textContent = value;
+    const bits = valueToBits(value);
+    modemBinaryDisplay.textContent = bits.join('');
+    modemTxBits.innerHTML = '';
+    bits.forEach(b => {
+      const d = document.createElement('div');
+      d.className = 'modem-bit';
+      d.textContent = b;
+      modemTxBits.appendChild(d);
+    });
+  }
+  modemValueSlider.addEventListener('input', renderModemTxBits);
+
+  modemSendBtn.addEventListener('click', () => {
+    const value = parseInt(modemValueSlider.value, 10);
+    const bits = valueToBits(value);
+    const ctx = getAudioCtx();
+    const startDelay = 0.08;
+    let t = ctx.currentTime + startDelay;
+
+    playModemTone(MODEM_PREAMBLE_FREQ, t, MODEM_PREAMBLE_MS/1000, 0.5);
+    t += MODEM_PREAMBLE_MS/1000;
+    bits.forEach(b => {
+      playModemTone(b ? MODEM_BIT1_FREQ : MODEM_BIT0_FREQ, t, MODEM_BIT_MS/1000, 0.5);
+      t += MODEM_BIT_MS/1000;
+    });
+
+    // UI上でもビットが光るタイミングを、実際の再生タイミングに合わせて表示する
+    const bitEls = modemTxBits.querySelectorAll('.modem-bit');
+    bitEls.forEach(el => el.classList.remove('on','off','active'));
+    const baseDelayMs = startDelay*1000 + MODEM_PREAMBLE_MS;
+    bits.forEach((b, i) => {
+      setTimeout(() => {
+        bitEls.forEach(el => el.classList.remove('active'));
+        bitEls[i].classList.add('active', b ? 'on' : 'off');
+      }, baseDelayMs + i*MODEM_BIT_MS);
+    });
+    setTimeout(() => { bitEls.forEach(el => el.classList.remove('active')); }, baseDelayMs + bits.length*MODEM_BIT_MS + 50);
+
+    log('音声モデム: ' + value + '（2進数 ' + bits.join('') + '）を送信');
+  });
+
+  // ---- 受信 ----
+  const dotRxM = document.getElementById('dotRxM');
+  const rxTextM = document.getElementById('rxTextM');
+  const rxBtnM = document.getElementById('rxBtnM');
+  const rxOffBtnM = document.getElementById('rxOffBtnM');
+  const fillPreamble = document.getElementById('fillPreamble');
+  const fillBit0 = document.getElementById('fillBit0');
+  const fillBit1 = document.getElementById('fillBit1');
+  const modemRxBits = document.getElementById('modemRxBits');
+  const modemReceivedVal = document.getElementById('modemReceivedVal');
+  const modemRxReset = document.getElementById('modemRxReset');
+
+  let analyserM = null, micStreamM = null, micSourceM = null, rxRunningM = false;
+  let modemState = 'idle'; // 'idle' | 'receiving'
+  let modemNextSampleTime = 0;
+  let modemBitsCollected = [];
+  const modemBitEls = [];
+
+  function renderModemRxBits(){
+    modemRxBits.innerHTML = '';
+    modemBitEls.length = 0;
+    for(let i=0;i<MODEM_BITS;i++){
+      const d = document.createElement('div');
+      d.className = 'modem-bit';
+      d.textContent = '?';
+      modemRxBits.appendChild(d);
+      modemBitEls.push(d);
+    }
+  }
+
+  function resetModemReceiveState(){
+    modemState = 'idle';
+    modemBitsCollected = [];
+    renderModemRxBits();
+    modemReceivedVal.textContent = '受信待ち…';
+    rxTextM.textContent = rxRunningM ? '待機中…（同期音を探しています）' : '未受信';
+  }
+  modemRxReset.addEventListener('click', () => { resetModemReceiveState(); log('音声モデム: 受信をリセット'); });
+
+  async function startModemRx(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      rxTextM.textContent = 'マイクが使用できません（httpsで開いているか確認）';
+      return;
+    }
+    try{
+      micStreamM = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      const ctx = getAudioCtx();
+      micSourceM = ctx.createMediaStreamSource(micStreamM);
+      analyserM = ctx.createAnalyser();
+      analyserM.fftSize = 4096;
+      micSourceM.connect(analyserM);
+
+      rxRunningM = true;
+      dotRxM.classList.add('on');
+      rxBtnM.classList.add('hidden');
+      rxOffBtnM.classList.remove('hidden');
+      resetModemReceiveState();
+      log('音声モデム: 受信を開始');
+      requestAnimationFrame(tickModemRx);
+    } catch(err){
+      rxTextM.textContent = 'エラー: ' + err.message;
+      log('マイク許可の取得に失敗: ' + err.message);
+    }
+  }
+  function stopModemRx(){
+    rxRunningM = false;
+    if(micStreamM){ micStreamM.getTracks().forEach(t => t.stop()); micStreamM = null; }
+    if(micSourceM){ micSourceM.disconnect(); micSourceM = null; }
+    analyserM = null;
+    dotRxM.classList.remove('on');
+    rxTextM.textContent = '未受信';
+    rxBtnM.classList.remove('hidden');
+    rxOffBtnM.classList.add('hidden');
+    fillPreamble.style.width='0%'; fillBit0.style.width='0%'; fillBit1.style.width='0%';
+  }
+  rxBtnM.addEventListener('click', startModemRx);
+  rxOffBtnM.addEventListener('click', stopModemRx);
+
+  function peakAtFreq(analyser, data, freq){
+    const bin = freqToBin(analyser, freq);
+    let peak = 0;
+    for(let i=Math.max(0,bin-2); i<=bin+2; i++){ if(data[i] > peak) peak = data[i]; }
+    return peak;
+  }
+
+  function tickModemRx(){
+    if(!rxRunningM || !analyserM) return;
+    const data = new Uint8Array(analyserM.frequencyBinCount);
+    analyserM.getByteFrequencyData(data);
+
+    const preamblePeak = peakAtFreq(analyserM, data, MODEM_PREAMBLE_FREQ);
+    const bit0Peak = peakAtFreq(analyserM, data, MODEM_BIT0_FREQ);
+    const bit1Peak = peakAtFreq(analyserM, data, MODEM_BIT1_FREQ);
+
+    fillPreamble.style.width = Math.min(100, (preamblePeak/255)*100) + '%';
+    fillBit0.style.width = Math.min(100, (bit0Peak/255)*100) + '%';
+    fillBit1.style.width = Math.min(100, (bit1Peak/255)*100) + '%';
+
+    const now = performance.now();
+
+    if(modemState === 'idle'){
+      if(preamblePeak >= MODEM_DETECT_THRESHOLD){
+        modemState = 'receiving';
+        modemBitsCollected = [];
+        // プリアンブルの残り時間ぶん待ってから、最初のビットの中央付近でサンプリングを始める
+        modemNextSampleTime = now + MODEM_BIT_MS/2;
+        rxTextM.textContent = '同期音を検出！受信中…';
+        log('音声モデム: 同期音を検出、受信開始');
+      }
+    } else if(modemState === 'receiving'){
+      if(now >= modemNextSampleTime){
+        const bit = bit1Peak > bit0Peak ? 1 : 0;
+        modemBitsCollected.push(bit);
+        const idx = modemBitsCollected.length - 1;
+        if(modemBitEls[idx]){
+          modemBitEls[idx].textContent = bit;
+          modemBitEls[idx].classList.add(bit ? 'on' : 'off');
+        }
+        modemNextSampleTime += MODEM_BIT_MS;
+        rxTextM.textContent = '受信中… ' + modemBitsCollected.length + ' / ' + MODEM_BITS + ' ビット';
+
+        if(modemBitsCollected.length >= MODEM_BITS){
+          const value = parseInt(modemBitsCollected.join(''), 2);
+          modemReceivedVal.textContent = '受信した数値: ' + value + '（2進数 ' + modemBitsCollected.join('') + '）';
+          rxTextM.textContent = '受信完了！';
+          log('音声モデム: 受信完了 → ' + value + '（' + modemBitsCollected.join('') + '）');
+          showToast('受信成功', '値: ' + value);
+          modemState = 'idle'; // 次の同期音を待つ状態に戻る（表示はそのまま残す）
+        }
+      }
+    }
+
+    requestAnimationFrame(tickModemRx);
   }
 })();
 </script>
