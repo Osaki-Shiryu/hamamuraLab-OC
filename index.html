@@ -2342,7 +2342,7 @@
   const MODEM_BIT_MS = 250;
   const MODEM_PREAMBLE_MS = 300;
   const MODEM_BITS = 8;
-  const MODEM_DETECT_THRESHOLD = 120; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
+  const MODEM_DETECT_THRESHOLD = 90; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
 
   function playModemTone(freq, startTime, durationSec, gainLevel){
     const ctx = getAudioCtx();
@@ -2428,7 +2428,9 @@
 
   let analyserM = null, micStreamM = null, micSourceM = null, rxRunningM = false;
   let modemState = 'idle'; // 'idle' | 'receiving'
-  let modemNextSampleTime = 0;
+  let modemWindowStartTime = 0;
+  let modemWindowIndex = 0;
+  let modemWinMaxBit0 = 0, modemWinMaxBit1 = 0;
   let modemBitsCollected = [];
   const modemBitEls = [];
 
@@ -2518,30 +2520,43 @@
       if(preamblePeak >= MODEM_DETECT_THRESHOLD){
         modemState = 'receiving';
         modemBitsCollected = [];
-        // プリアンブルの残り時間ぶん待ってから、最初のビットの中央付近でサンプリングを始める
-        modemNextSampleTime = now + MODEM_BIT_MS/2;
+        modemWindowIndex = 0;
+        modemWinMaxBit0 = 0;
+        modemWinMaxBit1 = 0;
+        // 同期音はまだ鳴り続けている途中で検出されるので、同期音の残り時間ぶん待ってから
+        // 最初のビット区間の計測を始める（ここで即ビット判定を始めると同期音自体を誤判定してしまう）
+        modemWindowStartTime = now + MODEM_PREAMBLE_MS;
         rxTextM.textContent = '同期音を検出！受信中…';
         log('音声モデム: 同期音を検出、受信開始');
       }
     } else if(modemState === 'receiving'){
-      if(now >= modemNextSampleTime){
-        const bit = bit1Peak > bit0Peak ? 1 : 0;
-        modemBitsCollected.push(bit);
-        const idx = modemBitsCollected.length - 1;
-        if(modemBitEls[idx]){
-          modemBitEls[idx].textContent = bit;
-          modemBitEls[idx].classList.add(bit ? 'on' : 'off');
-        }
-        modemNextSampleTime += MODEM_BIT_MS;
-        rxTextM.textContent = '受信中… ' + modemBitsCollected.length + ' / ' + MODEM_BITS + ' ビット';
+      if(now >= modemWindowStartTime){
+        // ビット区間全体を通しての最大値で判定する（一瞬のノイズで誤判定しないように）
+        if(bit0Peak > modemWinMaxBit0) modemWinMaxBit0 = bit0Peak;
+        if(bit1Peak > modemWinMaxBit1) modemWinMaxBit1 = bit1Peak;
 
-        if(modemBitsCollected.length >= MODEM_BITS){
-          const value = parseInt(modemBitsCollected.join(''), 2);
-          modemReceivedVal.textContent = '受信した数値: ' + value + '（2進数 ' + modemBitsCollected.join('') + '）';
-          rxTextM.textContent = '受信完了！';
-          log('音声モデム: 受信完了 → ' + value + '（' + modemBitsCollected.join('') + '）');
-          showToast('受信成功', '値: ' + value);
-          modemState = 'idle'; // 次の同期音を待つ状態に戻る（表示はそのまま残す）
+        const windowEnd = modemWindowStartTime + (modemWindowIndex+1) * MODEM_BIT_MS;
+        if(now >= windowEnd){
+          const bit = modemWinMaxBit1 > modemWinMaxBit0 ? 1 : 0;
+          modemBitsCollected.push(bit);
+          const idx = modemBitsCollected.length - 1;
+          if(modemBitEls[idx]){
+            modemBitEls[idx].textContent = bit;
+            modemBitEls[idx].classList.add(bit ? 'on' : 'off');
+          }
+          modemWindowIndex++;
+          modemWinMaxBit0 = 0;
+          modemWinMaxBit1 = 0;
+          rxTextM.textContent = '受信中… ' + modemBitsCollected.length + ' / ' + MODEM_BITS + ' ビット';
+
+          if(modemBitsCollected.length >= MODEM_BITS){
+            const value = parseInt(modemBitsCollected.join(''), 2);
+            modemReceivedVal.textContent = '受信した数値: ' + value + '（2進数 ' + modemBitsCollected.join('') + '）';
+            rxTextM.textContent = '受信完了！';
+            log('音声モデム: 受信完了 → ' + value + '（' + modemBitsCollected.join('') + '）');
+            showToast('受信成功', '値: ' + value);
+            modemState = 'idle'; // 次の同期音を待つ状態に戻る（表示はそのまま残す）
+          }
         }
       }
     }
