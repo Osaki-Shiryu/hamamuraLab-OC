@@ -651,15 +651,15 @@
     <!-- 確率共鳴シミュレーター -->
     <div class="panel hidden" id="srPanel">
       <div class="chan-title" style="margin-top:0;">確率共鳴シミュレーター</div>
-      <div class="sub" style="margin-top:0; text-align:left;">
-        点線は「本当は存在する弱い周期信号」です。これだけでは閾値(赤い点線)を超えないため検出できません。
-        ノイズを足すと、信号がノイズに押し上げられて閾値を周期的に超えるようになり、逆に検出しやすくなることがあります。
+
+      <div class="chan-title" style="margin-bottom:6px;">信号の形を選ぶ</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="chan-btn selected" id="srWaveSquareBtn">矩形波<br><span style="opacity:.8;">（パッ・フッと切り替わる）</span></div>
+        <div class="chan-btn" id="srWaveSineBtn">正弦波<br><span style="opacity:.8;">（なめらかに揺れる）</span></div>
       </div>
-      <div class="notice">
-        <b>確率共鳴（Stochastic Resonance）とは：</b> 弱すぎて閾値を超えない周期信号に、あえてノイズを加えることで
-        検出しやすくなる現象です。ノイズが少なすぎても効果はなく、多すぎても信号がノイズに埋もれてしまいます。
-        「ちょうどいいノイズの強さ」が存在するのがポイントです。
-      </div>
+
+      <div class="sub" style="margin-top:12px; text-align:left;" id="srDescText"></div>
+      <div class="notice" id="srNoticeText"></div>
 
       <div style="margin-top:16px;">
         <div class="chan-title" style="margin-bottom:6px;">ノイズ強度　σ = <span id="srSigmaVal">0.00</span></div>
@@ -668,14 +668,24 @@
 
       <svg id="srTimeSvg" viewBox="0 0 400 170" style="width:100%; margin-top:14px; background:#0a1a15; border:1px solid var(--line-dim); border-radius:10px; display:block;"></svg>
       <div class="sub" style="text-align:left; margin-top:6px;">
-        <span style="color:var(--sig-teal);">■</span> 隠れた弱い信号　
-        <span style="color:var(--text-main);">■</span> ノイズが乗った実際の信号　
-        <span style="color:var(--sig-red);">- -</span> 閾値　
-        <span style="color:var(--sig-green);">●</span> 検出された瞬間
+        <span style="color:var(--sig-teal);">▮</span> 薄い緑＝本当はON　
+        <span style="color:var(--text-main);">■</span> 信号（ノイズ入り）　
+        <span style="color:var(--sig-red);">- -</span> 閾値（ここを越えたらON/OFF判定）
       </div>
 
       <div class="stats" style="margin-top:14px;">
-        <div class="stat"><div class="num" id="srScoreVal">0</div><div class="lbl">検出しやすさスコア（0〜100）</div></div>
+        <div class="stat"><div class="num" id="srScoreVal">50%</div><div class="lbl">正解率（当てずっぽうで50%）</div></div>
+        <div class="stat"><div class="num" id="srBestVal">50%</div><div class="lbl">ベスト正解率</div></div>
+      </div>
+
+      <div class="mission" style="margin-top:16px;">
+        <div class="mission-title">🎯 チャレンジ：最適なノイズを見つけよう</div>
+        <div class="mission-desc">
+          スライダーを動かして、正解率<span id="srTargetLabel">85</span>%以上を<b>3秒間キープ</b>できるか挑戦してみましょう。
+          ノイズが少なすぎても多すぎても届きません。
+        </div>
+        <div class="hold-bar-track"><div class="hold-bar-fill" id="srHoldBarFill"></div></div>
+        <div class="hold-hint" id="srHoldHint">正解率85%以上でキープが始まります</div>
       </div>
 
       <div class="chan-title">ノイズ強度と検出しやすさの関係</div>
@@ -687,6 +697,7 @@
 
       <button class="act btn-back" id="srBack">通信メニューに戻る</button>
     </div>
+
 
     <!-- 音声モデム -->
     <div class="panel hidden" id="modemPanel">
@@ -853,6 +864,7 @@
     initSR();
   });
   srBack.addEventListener('click', () => {
+    stopSRLoop();
     srPanel.classList.add('hidden');
     commRoleSelect.classList.remove('hidden');
   });
@@ -897,6 +909,7 @@
     worldSound.classList.remove('hidden');
     worldComm.classList.add('hidden');
     stopModemRx();
+    stopSRLoop();
   });
   tabComm.addEventListener('click', () => {
     tabComm.classList.add('active');
@@ -909,6 +922,7 @@
     srPanel.classList.add('hidden');
     modemPanel.classList.add('hidden');
     stopModemRx();
+    stopSRLoop();
   });
 
   pickHost.addEventListener('click', () => showPanel(hostPanel));
@@ -2166,20 +2180,43 @@
   }
 
   // ============ 確率共鳴（Stochastic Resonance）シミュレーター ============
-  const SR_F_PERIODS_METRIC = 16; // 検出しやすさスコア計算に使う周期数（多いほど安定）
-  const SR_N_METRIC = 800;        // 上記に使うサンプル数
-  const SR_TRIALS_CURVE = 6;      // カーブ計算時に平均する試行回数
-  const SR_TRIALS_LIVE = 10;      // スライダー操作時のスコア表示に使う試行回数（安定性重視）
-  const SR_PERIODS_VIEW = 4;      // 時間波形表示に使う周期数
-  const SR_N_VIEW = 220;          // 時間波形表示のサンプル数
-  const SR_AMPLITUDE = 0.4;       // 隠れた弱い信号の振幅（閾値より小さい）
-  const SR_THRESHOLD = 1.0;       // 検出の閾値
-  const SR_SIGMA_MAX = 2.0;       // スライダーが取り得る最大ノイズ強度
-  const SR_CURVE_STEPS = 50;      // カーブのプロット点数
+  // モデル：隠れた信号は0/1を周期的に切り替える弱い矩形波。
+  // 検出器はヒステリシス（シュミットトリガー）方式：上側閾値を超えたら1、下側閾値を下回ったら0、
+  // その間は前の判定を維持する。指標は「判定が本当の状態と一致した割合＝正解率」。
+  const SR_TRIALS_CURVE = 10;      // カーブ計算時に平均する試行回数
+  const SR_AMPLITUDE = 0.5;        // 隠れた弱い信号の振幅（閾値より小さい）
+  const SR_THRESH_HIGH = 1.0;      // 上側閾値
+  const SR_THRESH_LOW = -1.0;      // 下側閾値
+  const SR_SIGMA_MAX = 2.0;        // スライダーが取り得る最大ノイズ強度
+  const SR_CURVE_STEPS = 50;       // カーブのプロット点数
+  const SR_SQUARE_PERIODS_METRIC = 30; // カーブ計算に使う切り替え回数
+  const SR_STEPS_PER_PERIOD_METRIC = 20; // カーブ計算時の1周期あたりのサンプル数
+
+  const SR_VIEW_LEN = 240;         // 波形表示に使うサンプル数（スクロールする窓の幅）
+  const SR_SCORE_WINDOW_LEN = 500; // 正解率計算に使うサンプル数
+  const SR_DT_PER_FRAME = 1/60;    // 1フレームで進む時間（周期単位）。値を大きくすると流れが速くなる
+  const SR_SCORE_UPDATE_EVERY = 12;// 表示更新の間引き（フレーム数ごと）
+
+  const SR_TARGET_ACCURACY = 85;   // チャレンジの目標正解率(%)
+  const SR_HOLD_MS = 3000;         // 目標正解率をキープする時間
 
   let srInitialized = false;
-  let srCurveData = []; // [{sigma, score0to100}]
-  let srMaxMetric = 1;
+  let srRunning = false;
+  let srCurveData = [];
+
+  let srT = 0; // 連続的に進む時間（周期単位）
+  let srTrueState = 1;     // 本当の状態（+1 or -1）
+  let srDetectorState = 1; // 検出器の現在の判定（+1 or -1、ヒステリシスで保持される）
+  let srBuf = []; // 波形表示用の直近サンプル {s, x, guess}
+  let srScoreBuf = []; // 正解率計算用の直近サンプル {correct:0or1}
+  let srFrameCount = 0;
+  let srDisplayAccuracy = 50;
+  let srBestAccuracy = 50;
+  let srHoldProgress = 0;
+  let srChallengeCleared = false;
+  let srLastTickTime = null;
+  let srDisplayYMax = 1.3; // 波形グラフの縦軸スケール（現在のσに応じて滑らかに追従させる）
+  let srWaveform = 'square'; // 'square'（矩形波） or 'sine'（正弦波）
 
   function gaussianRandom(){
     let u=0, v=0;
@@ -2188,55 +2225,56 @@
     return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
   }
 
-  // 一定時間ぶんの「隠れ信号・ノイズ入り信号・閾値検出結果」を生成する
-  function generateSRSeries(sigma, periods, N){
-    const ts=[], s=[], x=[], y=[];
-    for(let i=0;i<N;i++){
-      const t = (i/N) * periods;
-      const angle = 2*Math.PI*t;
-      const sig = SR_AMPLITUDE * Math.sin(angle);
-      const noise = sigma * gaussianRandom();
-      const val = sig + noise;
-      ts.push(t); s.push(sig); x.push(val); y.push(val > SR_THRESHOLD ? 1 : 0);
-    }
-    return { ts, s, x, y };
+  function currentSigma(){
+    return (srSigmaSlider.value/200) * SR_SIGMA_MAX;
   }
 
-  // 閾値検出結果 y(t) が、信号の周波数成分をどれだけ含むかを測る（検出しやすさの指標）
-  function computeSRMetric(sigma, periods, N, trials){
-    let total = 0;
+  // 矩形波の「本当の状態」：1周期のうち前半が+1、後半が-1
+  function squareState(t){
+    return (t % 1) < 0.5 ? 1 : -1;
+  }
+
+  // 選んだ波形の「生の値」（-1〜+1）。矩形波はパッ/フッと切り替わり、正弦波はなめらかに変化する。
+  function waveformRaw(t){
+    return srWaveform === 'sine' ? Math.sin(2*Math.PI*t) : squareState(t);
+  }
+  // 正解ラベル（+1 or -1）。矩形波は生の値そのまま、正弦波はプラスの半周期かマイナスの半周期かで判定。
+  function waveformTrueState(t){
+    return waveformRaw(t) >= 0 ? 1 : -1;
+  }
+
+  // ---- カーブ計算（一度だけ計算し、山の形を把握するための参照グラフとして使う） ----
+  // ヒステリシス検出器を実際にシミュレートし、正解率(%)を求める
+  function computeSRAccuracy(sigma, periods, stepsPerPeriod, trials){
+    let totalAcc = 0;
     for(let tr=0; tr<trials; tr++){
-      let sumSin=0, sumCos=0;
+      let detector = 1;
+      let correct = 0, total = 0;
+      const N = periods*stepsPerPeriod;
       for(let i=0;i<N;i++){
-        const t = (i/N) * periods;
-        const angle = 2*Math.PI*t;
-        const sig = SR_AMPLITUDE * Math.sin(angle);
-        const noise = sigma * gaussianRandom();
-        const val = sig + noise;
-        const yv = val > SR_THRESHOLD ? 1 : 0;
-        sumSin += yv * Math.sin(angle);
-        sumCos += yv * Math.cos(angle);
+        const t = i/stepsPerPeriod;
+        const trueSt = waveformTrueState(t);
+        const x = SR_AMPLITUDE*waveformRaw(t) + sigma*gaussianRandom();
+        if(x > SR_THRESH_HIGH) detector = 1;
+        else if(x < SR_THRESH_LOW) detector = -1;
+        if(detector === trueSt) correct++;
+        total++;
       }
-      total += (sumSin*sumSin + sumCos*sumCos) / (N*N);
+      totalAcc += (correct/total)*100;
     }
-    return total / trials;
+    return totalAcc/trials;
   }
 
   function buildSRCurve(){
     srCurveData = [];
-    srMaxMetric = 1e-9;
     for(let i=0;i<=SR_CURVE_STEPS;i++){
       const sigma = (i/SR_CURVE_STEPS) * SR_SIGMA_MAX;
-      const metric = computeSRMetric(sigma, SR_F_PERIODS_METRIC, SR_N_METRIC, SR_TRIALS_CURVE);
-      srCurveData.push({ sigma, metric });
-      if(metric > srMaxMetric) srMaxMetric = metric;
+      const acc = computeSRAccuracy(sigma, SR_SQUARE_PERIODS_METRIC, SR_STEPS_PER_PERIOD_METRIC, SR_TRIALS_CURVE);
+      srCurveData.push({ sigma, acc });
     }
   }
 
-  function metricToScore(metric){
-    return Math.max(0, Math.min(100, Math.round((metric / srMaxMetric) * 100)));
-  }
-
+  // ---- 描画 ----
   const SVG_NS = 'http://www.w3.org/2000/svg';
   function svgEl(tag, attrs){
     const el = document.createElementNS(SVG_NS, tag);
@@ -2244,87 +2282,218 @@
     return el;
   }
 
-  function drawSRTime(sigma){
+  function drawSRTime(yMax){
     const svg = document.getElementById('srTimeSvg');
     svg.innerHTML = '';
     const W=400, H=170, PAD=10;
-    const data = generateSRSeries(sigma, SR_PERIODS_VIEW, SR_N_VIEW);
+    const n = srBuf.length;
+    if(n < 2) return;
 
-    // 表示レンジは信号+ノイズの想定最大値に合わせて固定（見た目のブレを抑える）
-    const yMax = 1.2 + SR_SIGMA_MAX*3.2;
-    const yMin = -yMax;
-    const xOf = i => PAD + (i/(SR_N_VIEW-1)) * (W-2*PAD);
+    const xOf = i => PAD + (i/(SR_VIEW_LEN-1)) * (W-2*PAD);
     const yOf = v => H/2 - (v/yMax) * (H/2-PAD);
 
-    // 閾値の点線
-    const thY = yOf(SR_THRESHOLD);
-    svg.appendChild(svgEl('line', {x1:PAD, y1:thY, x2:W-PAD, y2:thY, stroke:'#ff5d6c', 'stroke-width':1, 'stroke-dasharray':'4,3'}));
-    // 中心線(0)
-    svg.appendChild(svgEl('line', {x1:PAD, y1:H/2, x2:W-PAD, y2:H/2, stroke:'#1c3a30', 'stroke-width':1}));
-
-    // 隠れた弱い信号（点線・teal）
-    let dS = '';
-    data.s.forEach((v,i) => { dS += (i===0?'M':'L') + xOf(i) + ',' + yOf(v) + ' '; });
-    svg.appendChild(svgEl('path', {d:dS, fill:'none', stroke:'#4fe8c8', 'stroke-width':1.5, 'stroke-dasharray':'3,3', opacity:'0.9'}));
-
-    // ノイズが乗った実際の信号（実線・白系）
-    let dX = '';
-    data.x.forEach((v,i) => { dX += (i===0?'M':'L') + xOf(i) + ',' + yOf(v) + ' '; });
-    svg.appendChild(svgEl('path', {d:dX, fill:'none', stroke:'#e6fff6', 'stroke-width':1.3, opacity:'0.85'}));
-
-    // 検出された瞬間（緑の点、閾値のライン上に表示）
-    data.y.forEach((yv,i) => {
-      if(yv > 0){
-        svg.appendChild(svgEl('circle', {cx:xOf(i), cy:thY, r:2.4, fill:'#5bffa8'}));
+    // 背景の色分け：「本当はON」の区間だけを薄く塗りつぶす（線を増やさずに正解を示す）
+    let runStart = null;
+    for(let i=0;i<n;i++){
+      const isOn = srBuf[i].s > 0;
+      if(isOn && runStart===null) runStart = i;
+      if(!isOn && runStart!==null){
+        svg.appendChild(svgEl('rect', {x:xOf(runStart), y:0, width:Math.max(0,xOf(i)-xOf(runStart)), height:H, fill:'#4fe8c8', opacity:'0.10'}));
+        runStart = null;
       }
-    });
+    }
+    if(runStart!==null){
+      svg.appendChild(svgEl('rect', {x:xOf(runStart), y:0, width:Math.max(0,xOf(n-1)-xOf(runStart)), height:H, fill:'#4fe8c8', opacity:'0.10'}));
+    }
+
+    // 上下の閾値（ここを越えたかどうかだけが判定を左右する）
+    const thHY = yOf(SR_THRESH_HIGH), thLY = yOf(SR_THRESH_LOW);
+    svg.appendChild(svgEl('line', {x1:PAD, y1:thHY, x2:W-PAD, y2:thHY, stroke:'#ff5d6c', 'stroke-width':1.4, 'stroke-dasharray':'4,3'}));
+    svg.appendChild(svgEl('line', {x1:PAD, y1:thLY, x2:W-PAD, y2:thLY, stroke:'#ff5d6c', 'stroke-width':1.4, 'stroke-dasharray':'4,3'}));
+
+    // ノイズが乗った実際の信号（唯一の"動く線"）
+    let dX = '';
+    srBuf.forEach((p,i) => { dX += (i===0?'M':'L') + xOf(i) + ',' + yOf(p.x) + ' '; });
+    svg.appendChild(svgEl('path', {d:dX, fill:'none', stroke:'#e6fff6', 'stroke-width':1.4, opacity:'0.9'}));
   }
 
-  function drawSRCurve(currentSigma){
+  function drawSRCurve(sigma, accuracy){
     const svg = document.getElementById('srCurveSvg');
     svg.innerHTML = '';
     const W=400, H=170, PADL=28, PADR=10, PADT=12, PADB=22;
-    const xOf = sigma => PADL + (sigma/SR_SIGMA_MAX) * (W-PADL-PADR);
-    const yOf = score => (H-PADB) - (score/100) * (H-PADB-PADT);
+    const xOf = s => PADL + (s/SR_SIGMA_MAX) * (W-PADL-PADR);
+    const yOf = acc => (H-PADB) - ((acc-50)/50) * (H-PADB-PADT); // 50%を底、100%を頂上とする
 
-    // 軸
     svg.appendChild(svgEl('line', {x1:PADL, y1:H-PADB, x2:W-PADR, y2:H-PADB, stroke:'#1c3a30', 'stroke-width':1}));
     svg.appendChild(svgEl('line', {x1:PADL, y1:PADT, x2:PADL, y2:H-PADB, stroke:'#1c3a30', 'stroke-width':1}));
 
-    // カーブ本体
+    // 目標正解率のライン
+    svg.appendChild(svgEl('line', {x1:PADL, y1:yOf(SR_TARGET_ACCURACY), x2:W-PADR, y2:yOf(SR_TARGET_ACCURACY), stroke:'#ffd76b', 'stroke-width':1, 'stroke-dasharray':'3,3', opacity:'0.7'}));
+    // 50%（当てずっぽう）ライン
+    svg.appendChild(svgEl('line', {x1:PADL, y1:yOf(50), x2:W-PADR, y2:yOf(50), stroke:'#5f9484', 'stroke-width':1, 'stroke-dasharray':'2,2', opacity:'0.6'}));
+
     let d = '';
     srCurveData.forEach((p,i) => {
-      const score = metricToScore(p.metric);
-      d += (i===0?'M':'L') + xOf(p.sigma) + ',' + yOf(score) + ' ';
+      d += (i===0?'M':'L') + xOf(p.sigma) + ',' + yOf(p.acc) + ' ';
     });
     svg.appendChild(svgEl('path', {d, fill:'none', stroke:'#4fe8c8', 'stroke-width':2}));
 
-    // 現在位置のマーカー
-    const nearest = srCurveData.reduce((a,b) => Math.abs(b.sigma-currentSigma) < Math.abs(a.sigma-currentSigma) ? b : a);
-    const curScore = metricToScore(nearest.metric);
-    svg.appendChild(svgEl('line', {x1:xOf(currentSigma), y1:PADT, x2:xOf(currentSigma), y2:H-PADB, stroke:'#ffb454', 'stroke-width':1, 'stroke-dasharray':'3,3'}));
-    svg.appendChild(svgEl('circle', {cx:xOf(currentSigma), cy:yOf(curScore), r:4.5, fill:'#ffb454'}));
+    svg.appendChild(svgEl('line', {x1:xOf(sigma), y1:PADT, x2:xOf(sigma), y2:H-PADB, stroke:'#ffb454', 'stroke-width':1, 'stroke-dasharray':'3,3'}));
+    svg.appendChild(svgEl('circle', {cx:xOf(sigma), cy:yOf(accuracy), r:4.5, fill:'#ffb454'}));
 
-    // 軸ラベル
     const lbl1 = svgEl('text', {x:PADL, y:H-6, fill:'#5f9484', 'font-size':'9'}); lbl1.textContent = 'σ=0';
     const lbl2 = svgEl('text', {x:W-PADR-30, y:H-6, fill:'#5f9484', 'font-size':'9'}); lbl2.textContent = 'σ=' + SR_SIGMA_MAX.toFixed(1);
     svg.appendChild(lbl1); svg.appendChild(lbl2);
+    const lbl3 = svgEl('text', {x:PADL+2, y:yOf(50)-3, fill:'#5f9484', 'font-size':'8'}); lbl3.textContent = '50%(当てずっぽう)';
+    svg.appendChild(lbl3);
   }
 
+  // ---- ライブ更新（continuous animation） ----
   const srSigmaSlider = document.getElementById('srSigmaSlider');
   const srSigmaVal = document.getElementById('srSigmaVal');
   const srScoreVal = document.getElementById('srScoreVal');
+  const srBestVal = document.getElementById('srBestVal');
+  const srHoldBarFill = document.getElementById('srHoldBarFill');
+  const srHoldHint = document.getElementById('srHoldHint');
+  const srTargetLabel = document.getElementById('srTargetLabel');
+  const srWaveSquareBtn = document.getElementById('srWaveSquareBtn');
+  const srWaveSineBtn = document.getElementById('srWaveSineBtn');
+  const srDescText = document.getElementById('srDescText');
+  const srNoticeText = document.getElementById('srNoticeText');
+  if(srTargetLabel) srTargetLabel.textContent = SR_TARGET_ACCURACY;
 
-  function updateSRDisplay(){
-    const sigma = (srSigmaSlider.value/200) * SR_SIGMA_MAX;
-    srSigmaVal.textContent = sigma.toFixed(2);
-    drawSRTime(sigma);
-    const metric = computeSRMetric(sigma, SR_F_PERIODS_METRIC, SR_N_METRIC, SR_TRIALS_LIVE);
-    srScoreVal.textContent = metricToScore(metric);
-    drawSRCurve(sigma);
+  const SR_DESC_TEXT =
+    '奥に隠れた信号は、弱すぎて赤い点線（閾値）に一度も届きません。σ(ノイズ)を0から少しずつ上げてみましょう。' +
+    'あるところで、下の正解率が急に上がり始めます。上げすぎるとまた下がります。一番正解率が高くなる' +
+    '「ちょうどいいノイズの強さ」を探してみましょう。';
+  const SR_NOTICE_HTML =
+    '<b>確率共鳴（Stochastic Resonance）：</b> 弱すぎて検出できない信号に、あえてノイズを足すと' +
+    '逆に検出しやすくなる不思議な現象です。少なすぎても多すぎてもダメで、「ちょうどいい強さ」が存在します。';
+  if(srNoticeText) srNoticeText.innerHTML = SR_NOTICE_HTML;
+
+  function updateSRWaveformTexts(){
+    if(srDescText) srDescText.textContent = SR_DESC_TEXT;
   }
 
-  srSigmaSlider.addEventListener('input', updateSRDisplay);
+  function setSRWaveform(mode){
+    if(srWaveform === mode) return;
+    srWaveform = mode;
+    if(srWaveSquareBtn) srWaveSquareBtn.classList.toggle('selected', mode === 'square');
+    if(srWaveSineBtn) srWaveSineBtn.classList.toggle('selected', mode === 'sine');
+    updateSRWaveformTexts();
+
+    // 波形が変わると検出しやすさの傾向（カーブ）も変わるので、参照グラフを計算し直し、
+    // ライブの正解率・チャレンジ進捗もリセットして公平に測り直せるようにする
+    buildSRCurve();
+    srScoreBuf = [];
+    srDisplayAccuracy = 50;
+    srBestAccuracy = 50;
+    srScoreVal.textContent = '50%';
+    srBestVal.textContent = '50%';
+    srHoldProgress = 0;
+    srChallengeCleared = false;
+    srHoldBarFill.style.width = '0%';
+    srHoldHint.textContent = '正解率' + SR_TARGET_ACCURACY + '%以上でキープが始まります';
+    log('確率共鳴シミュレーター: 信号の形を「' + (mode === 'sine' ? '正弦波' : '矩形波') + '」に切り替え');
+  }
+  if(srWaveSquareBtn) srWaveSquareBtn.addEventListener('click', () => setSRWaveform('square'));
+  if(srWaveSineBtn) srWaveSineBtn.addEventListener('click', () => setSRWaveform('sine'));
+  updateSRWaveformTexts();
+
+  srSigmaSlider.addEventListener('input', () => {
+    srSigmaVal.textContent = currentSigma().toFixed(2);
+  });
+
+  function computeLiveAccuracyFromWindow(){
+    const n = srScoreBuf.length;
+    if(n < 10) return 50;
+    let correctSum = 0;
+    for(let i=0;i<n;i++) correctSum += srScoreBuf[i];
+    return (correctSum/n)*100;
+  }
+
+  function srTick(ts){
+    if(!srRunning) return;
+    const now = ts || performance.now();
+    const dt = srLastTickTime ? Math.min(50, now - srLastTickTime) : 16;
+    srLastTickTime = now;
+
+    const sigma = currentSigma();
+    const steps = Math.max(1, Math.round(dt/16));
+
+    for(let s=0; s<steps; s++){
+      srT += SR_DT_PER_FRAME;
+      const trueSt = waveformTrueState(srT);
+      const noise = sigma * gaussianRandom();
+      const x = SR_AMPLITUDE*waveformRaw(srT) + noise;
+
+      if(x > SR_THRESH_HIGH) srDetectorState = 1;
+      else if(x < SR_THRESH_LOW) srDetectorState = -1;
+      // それ以外は前の判定を維持（ヒステリシス）
+
+      const correct = (srDetectorState === trueSt) ? 1 : 0;
+
+      srBuf.push({ s:trueSt, x:x, guess:srDetectorState });
+      if(srBuf.length > SR_VIEW_LEN) srBuf.shift();
+
+      srScoreBuf.push(correct);
+      if(srScoreBuf.length > SR_SCORE_WINDOW_LEN) srScoreBuf.shift();
+    }
+
+    // 縦軸スケールは「今のσ」に合わせて滑らかにズームさせる（σが小さいときに信号や閾値が
+    // 潰れて見えなくなるのを防ぐ。以前は常にσ最大値基準で固定していたため、σが小さいと
+    // グラフ中央にほぼ潰れて見えてしまっていた）
+    const targetYMax = 1.3 + sigma*3.2;
+    srDisplayYMax += (targetYMax - srDisplayYMax) * 0.08;
+    drawSRTime(srDisplayYMax);
+
+    srFrameCount++;
+    if(srFrameCount % SR_SCORE_UPDATE_EVERY === 0){
+      const liveAccuracy = computeLiveAccuracyFromWindow();
+      // 数値表示は指数移動平均でならし、波形は生きたまま・数字だけ追いかけやすくする
+      srDisplayAccuracy = Math.round(srDisplayAccuracy*0.75 + liveAccuracy*0.25);
+      srScoreVal.textContent = srDisplayAccuracy + '%';
+      if(srDisplayAccuracy > srBestAccuracy){ srBestAccuracy = srDisplayAccuracy; srBestVal.textContent = srBestAccuracy + '%'; }
+      drawSRCurve(sigma, srDisplayAccuracy);
+
+      // チャレンジ：目標正解率を一定時間キープできたらトロフィー（1セッション1回だけ）
+      if(!srChallengeCleared){
+        if(srDisplayAccuracy >= SR_TARGET_ACCURACY){
+          srHoldProgress = Math.min(SR_HOLD_MS, srHoldProgress + SR_SCORE_UPDATE_EVERY*16);
+          const pct = (srHoldProgress/SR_HOLD_MS)*100;
+          srHoldBarFill.style.width = pct + '%';
+          if(srHoldProgress >= SR_HOLD_MS){
+            srChallengeCleared = true;
+            srHoldBarFill.style.width = '100%';
+            srHoldHint.textContent = '🏆 達成済み！最適なノイズを見つけました';
+            showToast('最適なノイズを発見', '正解率' + SR_TARGET_ACCURACY + '%以上を' + (SR_HOLD_MS/1000) + '秒間キープしました');
+            log('確率共鳴シミュレーター: チャレンジ達成（σ=' + sigma.toFixed(2) + '）');
+          } else {
+            const remain = ((SR_HOLD_MS - srHoldProgress)/1000).toFixed(1);
+            srHoldHint.textContent = 'キープ中…あと ' + remain + ' 秒！';
+          }
+        } else {
+          srHoldProgress = Math.max(0, srHoldProgress - SR_SCORE_UPDATE_EVERY*16);
+          srHoldBarFill.style.width = (srHoldProgress/SR_HOLD_MS*100) + '%';
+          srHoldHint.textContent = srHoldProgress > 0
+            ? 'キープ解除中…もう一度正解率を上げよう'
+            : '正解率' + SR_TARGET_ACCURACY + '%以上でキープが始まります';
+        }
+      }
+    }
+
+    requestAnimationFrame(srTick);
+  }
+
+  function startSRLoop(){
+    if(srRunning) return;
+    srRunning = true;
+    srLastTickTime = null;
+    requestAnimationFrame(srTick);
+  }
+  function stopSRLoop(){
+    srRunning = false;
+  }
 
   function initSR(){
     if(!srInitialized){
@@ -2332,7 +2501,8 @@
       srInitialized = true;
       log('確率共鳴シミュレーター: カーブを計算しました');
     }
-    updateSRDisplay();
+    srSigmaVal.textContent = currentSigma().toFixed(2);
+    startSRLoop();
   }
 
   // ============ 音声モデム（FSKで実際にビットを送受信する） ============
