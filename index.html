@@ -718,8 +718,9 @@
         1ビットあたり250ms。周囲が静かな場所・スマホの音量を上げた状態で試してください。
       </div>
       <div class="notice hidden" id="modemNoticeFast">
-        <b>使うトーン：</b> 同期音(プリアンブル) 1500Hz。8つのビットそれぞれに専用の周波数（2100〜4900Hz、8チャンネル）を割り当て、
-        「1」のビットの音だけを<b>全部同時に</b>1回だけ鳴らします。8回に分けず1回で送るので、通常モードより高速です。
+        <b>使うトーン：</b> 同期音(プリアンブル) 1500Hz。8つのビットそれぞれに「0用」「1用」の専用周波数（2000〜5000Hz、16チャンネル）を割り当て、
+        各ビットの値に合う方の音を<b>8つ全部同時に</b>1回だけ鳴らします。8回に分けず1回で送るので、通常モードより高速です
+        （0のビットも必ず音が鳴るので、無音を基準にするより誤りに強くなっています）。
       </div>
 
       <div class="role-grid">
@@ -2531,9 +2532,11 @@
   // 「色んなチャンネルがある」なら、1ビットずつ順番に送らなくても、ビットごとに専用の周波数を
   // 割り当てて「1」のところだけ同時に鳴らせば、1回の送信で8ビット全部を運べる、という発想。
   const MODEM_PARALLEL_PREAMBLE_FREQ = 1500;
-  const MODEM_PARALLEL_BIT_FREQS = [2100, 2500, 2900, 3300, 3700, 4100, 4500, 4900]; // bit0(MSB)〜bit7(LSB)専用チャンネル（通常モードの周波数とは重ならない値に設定）
-  const MODEM_PARALLEL_CHORD_MS = 350; // 8ビット分を同時に鳴らす1回ぶんの長さ
-  const MODEM_PARALLEL_DETECT_THRESHOLD = 65; // 同時に鳴らす分1音あたりが小さくなるので、通常モードより低めに設定
+  // 各ビットに「0用」「1用」の2つの専用周波数を割り当て、常にどちらか一方を鳴らして
+  // 強い方を採用する（無音＝0という判定はノイズに弱いためやめ、通常モードと同じ「相対比較」にする）
+  const MODEM_PARALLEL_BIT0_FREQS = [2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800]; // 各ビットの「0」用チャンネル
+  const MODEM_PARALLEL_BIT1_FREQS = [2200, 2600, 3000, 3400, 3800, 4200, 4600, 5000]; // 各ビットの「1」用チャンネル
+  const MODEM_PARALLEL_CHORD_MS = 400; // 8ビット分を同時に鳴らす1回ぶんの長さ（相対比較のため少し長めに）
 
   let modemMode = 'normal'; // 'normal'（直列）｜'fast'（並列・高速）
 
@@ -2571,7 +2574,7 @@
     return t0;
   }
 
-  // 8ビット分の専用チャンネルのうち「1」のものだけを同時に鳴らす（並列・高速モード）。
+  // 8ビット分それぞれ「0用」「1用」の専用チャンネルのうち、値に合う方を常に鳴らす（並列・高速モード）。
   // 同期音のあと、1回のコード（和音）だけで8ビット全部を送り終える。
   function sendModemParallel(bits){
     const ctx = getAudioCtx();
@@ -2593,17 +2596,16 @@
     preOsc.stop(tChordStart + 0.05);
     preOsc.onended = () => { try{ preOsc.disconnect(); preGain.disconnect(); }catch(e){} };
 
-    // 「1」のビットのチャンネルだけを同時に鳴らす（同時に鳴る音の数で音量を調整し、割れを防ぐ）
-    const activeCount = bits.filter(b => b).length;
+    // 8ビット全部ぶん、常に「0用」か「1用」のどちらかを鳴らす（無音になるチャンネルはない）
     const tChordEnd = tChordStart + MODEM_PARALLEL_CHORD_MS/1000;
-    const perToneGain = activeCount > 0 ? Math.min(0.7, 0.9/activeCount) : 0;
+    const perToneGain = 0.9 / MODEM_BITS; // 常に8音同時なので固定値でOK（割れない音量）
 
     bits.forEach((b, i) => {
-      if(!b) return;
+      const freq = b ? MODEM_PARALLEL_BIT1_FREQS[i] : MODEM_PARALLEL_BIT0_FREQS[i];
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(MODEM_PARALLEL_BIT_FREQS[i], tChordStart);
+      osc.frequency.setValueAtTime(freq, tChordStart);
       osc.connect(gain).connect(ctx.destination);
       gain.gain.setValueAtTime(0, tChordStart);
       gain.gain.linearRampToValueAtTime(perToneGain, tChordStart + 0.02);
@@ -2716,8 +2718,8 @@
   let modemBitsCollected = [];
   const modemBitEls = [];
 
-  // ---- 高速モード（並列）用：8ビット分のメーターをまとめて生成 ----
-  const modemFastFillEls = { preamble:null, bits:[] };
+  // ---- 高速モード（並列）用：8ビット分のメーター（0用/1用を並べて表示）をまとめて生成 ----
+  const modemFastFillEls = { preamble:null, zero:[], one:[] };
   function buildModemFastMeters(){
     modemEnergyFast.innerHTML = '';
     const rowPre = document.createElement('div');
@@ -2726,16 +2728,28 @@
     modemEnergyFast.appendChild(rowPre);
     modemFastFillEls.preamble = rowPre.querySelector('.modem-energy-fill');
 
-    MODEM_PARALLEL_BIT_FREQS.forEach((freq, i) => {
+    const legend = document.createElement('div');
+    legend.style.cssText = 'display:flex; justify-content:flex-end; gap:14px; font-size:10.5px; color:var(--text-dim); margin-bottom:4px;';
+    legend.innerHTML = '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--sig-amber);margin-right:3px;"></span>0用</span>' +
+                        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--sig-green);margin-right:3px;"></span>1用</span>';
+    modemEnergyFast.appendChild(legend);
+
+    for(let i=0;i<MODEM_BITS;i++){
       const row = document.createElement('div');
       row.className = 'modem-energy-row';
-      row.innerHTML = '<div class="modem-energy-label">b' + i + '（' + freq + 'Hz）</div><div class="modem-energy-track"><div class="modem-energy-fill"></div></div>';
+      row.innerHTML =
+        '<div class="modem-energy-label">b' + i + '</div>' +
+        '<div class="modem-energy-track" style="flex:1;"><div class="modem-energy-fill" style="background:var(--sig-amber);"></div></div>' +
+        '<div class="modem-energy-track" style="flex:1;"><div class="modem-energy-fill" style="background:var(--sig-green);"></div></div>';
       modemEnergyFast.appendChild(row);
-      modemFastFillEls.bits.push(row.querySelector('.modem-energy-fill'));
-    });
+      const fills = row.querySelectorAll('.modem-energy-fill');
+      modemFastFillEls.zero.push(fills[0]);
+      modemFastFillEls.one.push(fills[1]);
+    }
   }
   buildModemFastMeters();
-  let modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
+  let modemWinMaxParallel0 = new Array(MODEM_BITS).fill(0);
+  let modemWinMaxParallel1 = new Array(MODEM_BITS).fill(0);
 
   function renderModemRxBits(){
     modemRxBits.innerHTML = '';
@@ -2752,13 +2766,15 @@
   function resetModemReceiveState(){
     modemState = 'idle';
     modemBitsCollected = [];
-    modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
+    modemWinMaxParallel0 = new Array(MODEM_BITS).fill(0);
+    modemWinMaxParallel1 = new Array(MODEM_BITS).fill(0);
     renderModemRxBits();
     modemReceivedVal.textContent = '受信待ち…';
     rxTextM.textContent = rxRunningM ? '待機中…（同期音を探しています）' : '未受信';
     if(modemFastFillEls.preamble){
       modemFastFillEls.preamble.style.width = '0%';
-      modemFastFillEls.bits.forEach(el => { el.style.width = '0%'; });
+      modemFastFillEls.zero.forEach(el => { el.style.width = '0%'; });
+      modemFastFillEls.one.forEach(el => { el.style.width = '0%'; });
     }
   }
   modemRxReset.addEventListener('click', () => { resetModemReceiveState(); log('音声モデム: 受信をリセット'); });
@@ -2800,7 +2816,8 @@
     fillPreamble.style.width='0%'; fillBit0.style.width='0%'; fillBit1.style.width='0%';
     if(modemFastFillEls.preamble){
       modemFastFillEls.preamble.style.width = '0%';
-      modemFastFillEls.bits.forEach(el => { el.style.width = '0%'; });
+      modemFastFillEls.zero.forEach(el => { el.style.width = '0%'; });
+      modemFastFillEls.one.forEach(el => { el.style.width = '0%'; });
     }
   }
   rxBtnM.addEventListener('click', startModemRx);
@@ -2883,29 +2900,34 @@
     }
   }
 
-  // 高速モード：8ビット分のチャンネルを一度に測って、1回のコードで8ビット全部を判定する
+  // 高速モード：8ビット分×2チャンネル（0用/1用）を一度に測って、1回のコードで8ビット全部を判定する。
+  // 通常モードと同じく「0用と1用のどちらが強いか」の相対比較で決めるので、無音を基準にする方式より安定する。
   function tickModemRxFast(data, now){
     const preamblePeak = peakAtFreq(analyserM, data, MODEM_PARALLEL_PREAMBLE_FREQ);
     modemFastFillEls.preamble.style.width = Math.min(100, (preamblePeak/255)*100) + '%';
 
-    const bitPeaks = MODEM_PARALLEL_BIT_FREQS.map(freq => peakAtFreq(analyserM, data, freq));
-    bitPeaks.forEach((p, i) => { modemFastFillEls.bits[i].style.width = Math.min(100, (p/255)*100) + '%'; });
+    const peaks0 = MODEM_PARALLEL_BIT0_FREQS.map(freq => peakAtFreq(analyserM, data, freq));
+    const peaks1 = MODEM_PARALLEL_BIT1_FREQS.map(freq => peakAtFreq(analyserM, data, freq));
+    peaks0.forEach((p, i) => { modemFastFillEls.zero[i].style.width = Math.min(100, (p/255)*100) + '%'; });
+    peaks1.forEach((p, i) => { modemFastFillEls.one[i].style.width = Math.min(100, (p/255)*100) + '%'; });
 
     if(modemState === 'idle'){
       if(preamblePeak >= MODEM_DETECT_THRESHOLD){
         modemState = 'receiving';
-        modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
+        modemWinMaxParallel0 = new Array(MODEM_BITS).fill(0);
+        modemWinMaxParallel1 = new Array(MODEM_BITS).fill(0);
         modemWindowStartTime = now + MODEM_PREAMBLE_MS;
         rxTextM.textContent = '同期音を検出！8ビット同時受信中…';
         log('音声モデム（高速）: 同期音を検出、受信開始');
       }
     } else if(modemState === 'receiving'){
       if(now >= modemWindowStartTime){
-        bitPeaks.forEach((p, i) => { if(p > modemWinMaxParallel[i]) modemWinMaxParallel[i] = p; });
+        peaks0.forEach((p, i) => { if(p > modemWinMaxParallel0[i]) modemWinMaxParallel0[i] = p; });
+        peaks1.forEach((p, i) => { if(p > modemWinMaxParallel1[i]) modemWinMaxParallel1[i] = p; });
 
         const windowEnd = modemWindowStartTime + MODEM_PARALLEL_CHORD_MS;
         if(now >= windowEnd){
-          const bits = modemWinMaxParallel.map(p => p >= MODEM_PARALLEL_DETECT_THRESHOLD ? 1 : 0);
+          const bits = modemWinMaxParallel0.map((p0, i) => modemWinMaxParallel1[i] > p0 ? 1 : 0);
           bits.forEach((b, i) => {
             if(modemBitEls[i]){
               modemBitEls[i].textContent = b;
