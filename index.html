@@ -801,7 +801,8 @@
 
       <div style="margin-top:16px;">
         <div class="chan-title" style="margin-bottom:6px;">ノイズの強さ　σ = <span id="labSigmaVal">0.00</span></div>
-        <input type="range" id="labSigmaSlider" min="0" max="160" value="0" style="width:100%;">
+        <input type="range" id="labSigmaSlider" min="0" max="600" value="0" style="width:100%;">
+        <div class="sub" style="margin-top:2px; font-size:11px;">最大まで上げると、どの変調方式でもかなりの確率でビットが化けます（PSKが一番強く、ASKが一番弱いはずです）。</div>
       </div>
 
       <div class="status-row" style="margin-top:14px;"><div class="dot" id="labDot"></div><div class="status-text" id="labStatusText">設定を選んで「送信する」を押してください</div></div>
@@ -3080,8 +3081,15 @@
   function labComputeParity(bits){ return bits.reduce((a,b)=>a^b, 0); }
   function labMajorityVote(a,b,c){ return (a+b+c) >= 2 ? 1 : 0; }
 
-  const LAB_PAD = 15, LAB_W = 400, LAB_TOPY = 55, LAB_BOTY = 155, LAB_SCALE = 28, LAB_BITS = 8;
+  const LAB_PAD = 15, LAB_W = 400, LAB_TOPY = 55, LAB_BOTY = 155, LAB_BITS = 8;
+  const LAB_HALF_HEIGHT = 38; // 波形プロットの片側の高さ(px)
   const LAB_SLOTW = (LAB_W - LAB_PAD*2) / LAB_BITS;
+
+  // ノイズσが大きいほど波形の振れ幅も大きくなるので、σに応じて縦軸を自動でズームアウトする
+  // （振幅の目安1.2 + ノイズの典型的な振れ幅3σぶんが、常にプロット領域に収まるようにする）
+  function labComputeScale(sigma){
+    return LAB_HALF_HEIGHT / (1.2 + sigma*3.0);
+  }
   const LAB_STEP_MS = 130; // 送信・受信アニメーションの1ビットあたりの間隔
 
   let labModType = 'ASK';
@@ -3132,6 +3140,7 @@
     });
     labSigmaSlider.addEventListener('input', () => {
       labSigmaVal.textContent = (parseInt(labSigmaSlider.value,10)/100).toFixed(2);
+      labUpdatePreview();
     });
     labSendBtn.addEventListener('click', labStartSend);
     labParityToggle.addEventListener('click', () => {
@@ -3151,7 +3160,7 @@
   }
 
   // 目盛り線・送信波形（常に表示）を描き、受信波形用の空パスを用意しておく
-  function drawLabSkeletonAndClean(cleanPerBit){
+  function drawLabSkeletonAndClean(cleanPerBit, scale){
     const svg = document.getElementById('labWaveSvg');
     svg.innerHTML = '';
     for(let i=0;i<=LAB_BITS;i++){
@@ -3166,7 +3175,7 @@
     cleanPerBit.forEach((samples, bi) => {
       samples.forEach((v, i) => {
         const x = LAB_PAD + bi*LAB_SLOTW + (i/LAB_SPS)*LAB_SLOTW;
-        const y = LAB_TOPY - v*LAB_SCALE;
+        const y = LAB_TOPY - v*scale;
         dClean += (bi===0 && i===0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
       });
     });
@@ -3178,13 +3187,13 @@
   }
 
   // 受信波形を1ビットぶんずつ書き足していく（送信アニメーション用）
-  function labAppendNoisySegment(bitIndex, noisySamples){
+  function labAppendNoisySegment(bitIndex, noisySamples, scale){
     const path = document.getElementById('labNoisyPath');
     if(!path) return;
     let seg = '';
     noisySamples.forEach((v, i) => {
       const x = LAB_PAD + bitIndex*LAB_SLOTW + (i/LAB_SPS)*LAB_SLOTW;
-      const y = LAB_BOTY - v*LAB_SCALE;
+      const y = LAB_BOTY - v*scale;
       const isVeryFirst = (bitIndex===0 && i===0);
       seg += (isVeryFirst ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
     });
@@ -3235,12 +3244,14 @@
   // 設定（数値・変調方式）を変えるたびに呼ぶ：ノイズは乗せず、送信側の見た目だけ更新する
   function labUpdatePreview(){
     const labValueSlider = document.getElementById('labValueSlider');
+    const labSigmaSlider = document.getElementById('labSigmaSlider');
     if(!labValueSlider) return;
     const value = parseInt(labValueSlider.value, 10);
+    const sigma = parseInt(labSigmaSlider.value, 10)/100;
     const bits = value.toString(2).padStart(8,'0').split('').map(Number);
     const cleanPerBit = bits.map(b => labCleanSamples(labModType, b));
 
-    drawLabSkeletonAndClean(cleanPerBit);
+    drawLabSkeletonAndClean(cleanPerBit, labComputeScale(sigma));
     labRenderBitsRow('labTxBits', bits, null);
     labInitRxPlaceholder();
     document.getElementById('labResultText').textContent = '送信を待っています…';
@@ -3264,6 +3275,7 @@
 
     const value = parseInt(labValueSlider.value, 10);
     const sigma = parseInt(labSigmaSlider.value, 10)/100;
+    const scale = labComputeScale(sigma);
     const bits = value.toString(2).padStart(8,'0').split('').map(Number);
 
     const cleanPerBit = [], noisyPerBit = [], rxBits = [];
@@ -3278,7 +3290,7 @@
     labSendBtn.disabled = true;
     labSendBtn.style.opacity = '0.6';
     labDot.classList.add('on');
-    drawLabSkeletonAndClean(cleanPerBit);
+    drawLabSkeletonAndClean(cleanPerBit, scale);
     labRenderBitsRow('labTxBits', bits, null);
     labInitRxPlaceholder();
     labResultText.textContent = '送信中…';
@@ -3301,7 +3313,7 @@
 
     for(let i=0;i<LAB_BITS;i++){
       setTimeout(() => {
-        labAppendNoisySegment(i, noisyPerBit[i]);
+        labAppendNoisySegment(i, noisyPerBit[i], scale);
         labRevealRxBit(i, rxBits[i], rxBits[i] === bits[i]);
       }, phase1End + i*LAB_STEP_MS);
     }
