@@ -827,8 +827,9 @@
         <button class="act btn-seek" id="rxBtnMorse">受信開始</button>
         <button class="act btn-off hidden" id="rxOffBtnMorse">受信終了</button>
 
-        <div style="margin-top:16px;">
-          <div class="modem-energy-row"><div class="modem-energy-label">音の強さ</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillMorseTone"></div></div></div>
+        <div style="margin-top:16px; position:relative;">
+          <div class="modem-energy-row"><div class="modem-energy-label">音の強さ</div><div class="modem-energy-track" style="position:relative;"><div class="modem-energy-fill" id="fillMorseTone"></div><div id="morseThresholdMark" style="position:absolute; top:0; bottom:0; width:2px; background:var(--sig-red); left:0%;"></div></div></div>
+          <div class="sub" style="text-align:right; font-size:11px; margin-top:2px;" id="morseCalibText">受信開始で周囲の音の大きさを自動で測ります</div>
         </div>
 
         <div style="text-align:center; margin-top:10px; font-family:var(--font-display); font-size:18px; color:var(--sig-amber); letter-spacing:2px; min-height:26px; word-break:break-all;" id="morseRxPreview"></div>
@@ -3072,8 +3073,9 @@
   const MORSE_REVERSE = {};
   Object.entries(MORSE_TABLE).forEach(([ch, code]) => { MORSE_REVERSE[code] = ch; });
 
-  const MORSE_FREQ = 1000; // 送受信に使う音の高さ
-  const MORSE_DETECT_THRESHOLD = 80; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
+  const MORSE_FREQ = 1800; // 送受信に使う音の高さ（人の声や環境音が少ない帯域に変更）
+  const MORSE_CALIBRATE_MS = 700; // 受信開始直後、周囲の音の大きさを測る時間
+  const MORSE_DEBOUNCE_FRAMES = 2; // ノイズの1コマだけの山でオン/オフを誤判定しないための連続確認回数
 
   function morseCodeToDisplay(code){
     return code.split('').map(s => s === '.' ? '・' : '－').join('');
@@ -3168,6 +3170,8 @@
   const rxBtnMorse = document.getElementById('rxBtnMorse');
   const rxOffBtnMorse = document.getElementById('rxOffBtnMorse');
   const fillMorseTone = document.getElementById('fillMorseTone');
+  const morseThresholdMark = document.getElementById('morseThresholdMark');
+  const morseCalibText = document.getElementById('morseCalibText');
   const morseRxPreview = document.getElementById('morseRxPreview');
   const morseReceivedVal = document.getElementById('morseReceivedVal');
   const morseRxReset = document.getElementById('morseRxReset');
@@ -3180,6 +3184,21 @@
   let morseLetterFinalized = true;
   let morseWordGapAdded = true;
 
+  // ---- しきい値の自動キャリブレーション（周囲の音の大きさに合わせる） ----
+  let morseCalibrating = false;
+  let morseCalibStartTime = 0;
+  let morseCalibMaxPeak = 0;
+  let morseThreshold = 60; // キャリブレーション前の仮の初期値
+
+  // ---- 1コマのノイズで誤判定しないためのデバウンス ----
+  let morsePendingState = false;
+  let morsePendingCount = 0;
+
+  function setMorseThresholdMark(){
+    morseThresholdMark.style.left = Math.min(100, (morseThreshold/255)*100) + '%';
+  }
+  setMorseThresholdMark();
+
   function resetMorseReceiveState(){
     morseToneOn = false;
     morseLastTransitionTime = performance.now();
@@ -3187,6 +3206,8 @@
     morseDecodedText = '';
     morseLetterFinalized = true;
     morseWordGapAdded = true;
+    morsePendingState = false;
+    morsePendingCount = 0;
     morseRxPreview.textContent = '';
     morseReceivedVal.textContent = '受信待ち…';
     rxTextMorse.textContent = rxRunningMorse ? '待機中…（信号を聞いています）' : '未受信';
@@ -3211,7 +3232,15 @@
       rxBtnMorse.classList.add('hidden');
       rxOffBtnMorse.classList.remove('hidden');
       resetMorseReceiveState();
-      log('モールス信号: 受信を開始');
+
+      // 受信開始直後は、まだ何も送信しないでもらい、周囲の音の大きさ（ノイズの床）を測る
+      morseCalibrating = true;
+      morseCalibStartTime = performance.now();
+      morseCalibMaxPeak = 0;
+      rxTextMorse.textContent = '周囲の音を測定中…（このタイミングでは送信しないでください）';
+      morseCalibText.textContent = 'キャリブレーション中…';
+
+      log('モールス信号: 受信を開始（周囲の音を測定中）');
       requestAnimationFrame(tickMorseRx);
     } catch(err){
       rxTextMorse.textContent = 'エラー: ' + err.message;
@@ -3220,6 +3249,7 @@
   }
   function stopMorseRx(){
     rxRunningMorse = false;
+    morseCalibrating = false;
     if(micStreamMorse){ micStreamMorse.getTracks().forEach(t => t.stop()); micStreamMorse = null; }
     if(micSourceMorse){ micSourceMorse.disconnect(); micSourceMorse = null; }
     analyserMorse = null;
@@ -3251,7 +3281,34 @@
     fillMorseTone.style.width = Math.min(100, (peak/255)*100) + '%';
 
     const now = performance.now();
-    const isOn = peak >= MORSE_DETECT_THRESHOLD;
+
+    // ---- キャリブレーション中：周囲の音の最大値を測っておき、そこから少し上をしきい値にする ----
+    if(morseCalibrating){
+      if(peak > morseCalibMaxPeak) morseCalibMaxPeak = peak;
+      if(now - morseCalibStartTime >= MORSE_CALIBRATE_MS){
+        morseThreshold = Math.max(30, morseCalibMaxPeak * 1.6, morseCalibMaxPeak + 18);
+        morseThreshold = Math.min(morseThreshold, 200); // 上げすぎて何も検出できなくなるのを防ぐ
+        setMorseThresholdMark();
+        morseCalibrating = false;
+        morseCalibText.textContent = 'しきい値: ' + Math.round(morseThreshold) + '（周囲の音: ' + Math.round(morseCalibMaxPeak) + '）';
+        rxTextMorse.textContent = '準備完了！信号を送ってください';
+        morseLastTransitionTime = now;
+        log('モールス信号: キャリブレーション完了（しきい値=' + Math.round(morseThreshold) + '）');
+      }
+      requestAnimationFrame(tickMorseRx);
+      return;
+    }
+
+    // ---- 1コマだけのノイズの山で誤判定しないよう、連続で同じ状態が続いたときだけオン/オフを確定する ----
+    const rawIsOn = peak >= morseThreshold;
+    if(rawIsOn === morsePendingState){
+      morsePendingCount++;
+    } else {
+      morsePendingState = rawIsOn;
+      morsePendingCount = 1;
+    }
+    const isOn = (morsePendingCount >= MORSE_DEBOUNCE_FRAMES) ? morsePendingState : morseToneOn;
+
     const unit = 1200/currentMorseWpm();
 
     if(isOn !== morseToneOn){
