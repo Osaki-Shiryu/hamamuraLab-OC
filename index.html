@@ -277,6 +277,8 @@
   .modem-bit.on{ background:#0f261f; border-color:var(--sig-green); color:var(--sig-green); }
   .modem-bit.off{ background:#1a1004; border-color:var(--sig-amber); color:var(--sig-amber); }
   .modem-bit.active{ transform:scale(1.15); }
+  .modem-bit.match{ background:#0f261f; border-color:var(--sig-green); color:var(--sig-green); }
+  .modem-bit.err{ background:#2a0f11; border-color:var(--sig-red); color:var(--sig-red); }
 
   .modem-energy-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
   .modem-energy-label{ width:76px; font-family:var(--font-display); font-size:11px; color:var(--text-dim); flex-shrink:0; }
@@ -640,15 +642,10 @@
           <div><div class="ttl">音声モデム（実験的）</div>
           <div class="desc">数値を2進数に変換し、音の高さの切り替え（FSK変調）で実際に送受信する</div></div>
         </div>
-        <div class="role-card seek" id="pickMorse">
-          <div class="big">📡</div>
-          <div><div class="ttl">モールス信号体験（歴史編）</div>
-          <div class="desc">トン・ツーの音で文字を送受信。戦艦や船の無線で実際に使われていた通信を体験</div></div>
-        </div>
-        <div class="role-card" style="opacity:.4; cursor:default;">
-          <div class="big">🧩</div>
-          <div><div class="ttl">準備中</div>
-          <div class="desc">誤り訂正・多元接続など、他のシミュレーションも追加予定</div></div>
+        <div class="role-card seek" id="pickLab">
+          <div class="big">🧪</div>
+          <div><div class="ttl">デジタル無線通信 実験室</div>
+          <div class="desc">変調方式とノイズを自由に変えて、誤りの発生と訂正をその場で確認する</div></div>
         </div>
       </div>
     </div>
@@ -779,67 +776,56 @@
       <button class="act btn-back" id="modemBack" style="margin-top:16px;">通信メニューに戻る</button>
     </div>
 
-    <!-- モールス信号体験 -->
-    <div class="panel hidden" id="morsePanel">
-      <div class="chan-title" style="margin-top:0;">モールス信号体験（歴史編）</div>
+    <!-- デジタル無線通信 実験室 -->
+    <div class="panel hidden" id="labPanel">
+      <div class="chan-title" style="margin-top:0;">デジタル無線通信 実験室</div>
       <div class="sub" style="margin-top:0; text-align:left;">
-        文字を「トン（短点）」「ツー（長点）」の音の長さで表す、無線通信でもっとも古い方式のひとつです。
-        船同士・船と陸との通信で、100年以上前から実際に使われてきました。
+        数値を8bitの2進数にして、変調方式とノイズを自由に変えながら、「送った波形」と
+        「ノイズが乗って受信された波形」の違いをその場で確認できます。マイクやスピーカーは使わず、
+        画面の中だけで完結するシミュレーターです。
       </div>
 
-      <div class="notice">
-        <b>歴史のひとこと：</b> 1905年の日本海海戦で、参謀・秋山真之が大本営に打電した
-        「本日天気晴朗ナレドモ波高シ」も、この無線電信（モールス符号）で送られたものです。
-        遭難信号の「SOS」（<span style="font-family:monospace;">・・・－－－・・・</span>）も、
-        実は「Save Our Souls」の略ではなく、単に「短くて聞き取りやすい符号」として1905年に選ばれた記号です。
+      <div class="chan-title" style="margin-bottom:6px;">送る数値（0〜255）</div>
+      <input type="range" id="labValueSlider" min="0" max="255" value="181" style="width:100%;">
+      <div style="text-align:center; margin-top:6px;">
+        <div style="font-family:var(--font-display); font-size:24px; color:var(--sig-teal);" id="labValueDisplay">181</div>
+        <div style="font-family:var(--font-display); font-size:12px; color:var(--text-dim);">2進数: <span id="labBinaryDisplay">10110101</span></div>
       </div>
 
-      <div class="role-grid">
-        <div class="role-card host" id="pickMorseTx">
-          <div class="big">📤</div>
-          <div><div class="ttl">送信</div><div class="desc">文字を入力して音で送る</div></div>
-        </div>
-        <div class="role-card seek" id="pickMorseRx">
-          <div class="big">📥</div>
-          <div><div class="ttl">受信</div><div class="desc">マイクで聞き取って文字に戻す</div></div>
-        </div>
+      <div class="chan-title" style="margin:16px 0 6px;">変調方式を選ぶ</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+        <div class="chan-btn selected" id="labModASK">ASK<br><span style="opacity:.8;">振幅変調</span></div>
+        <div class="chan-btn" id="labModFSK">FSK<br><span style="opacity:.8;">周波数変調</span></div>
+        <div class="chan-btn" id="labModPSK">PSK<br><span style="opacity:.8;">位相変調</span></div>
       </div>
 
       <div style="margin-top:16px;">
-        <div class="chan-title" style="margin-bottom:6px;">速さ（WPM）　<span id="morseWpmVal">15</span> WPM</div>
-        <input type="range" id="morseWpmSlider" min="8" max="25" value="15" style="width:100%;">
-        <div class="sub" style="margin-top:4px; text-align:left; font-size:12px;">数字が小さいほどゆっくり（聞き取り・受信しやすい）。送信側と受信側で同じ速さに合わせてください。</div>
+        <div class="chan-title" style="margin-bottom:6px;">ノイズの強さ　σ = <span id="labSigmaVal">0.00</span></div>
+        <input type="range" id="labSigmaSlider" min="0" max="160" value="0" style="width:100%;">
       </div>
 
-      <!-- 送信 -->
-      <div class="panel hidden" id="morseTxPanel" style="margin-top:16px;">
-        <div class="chan-title" style="margin-top:0;">送る文章を入力（英数字）</div>
-        <input type="text" id="morseTextInput" maxlength="40" placeholder="例: SOS" value="SOS" style="width:100%; box-sizing:border-box; padding:10px; font-size:16px; border-radius:8px; border:1px solid var(--line-dim); background:#0a1a15; color:var(--text-main);">
-        <div style="text-align:center; margin-top:12px; font-family:var(--font-display); font-size:20px; color:var(--sig-teal); letter-spacing:2px; word-break:break-all;" id="morsePreview">・・・ －－－ ・・・</div>
+      <div class="status-row" style="margin-top:14px;"><div class="dot" id="labDot"></div><div class="status-text" id="labStatusText">設定を選んで「送信する」を押してください</div></div>
+      <button class="act btn-host" id="labSendBtn">📡 送信する</button>
 
-        <button class="act btn-host" id="morseSendBtn">🔊 モールス信号で送信する</button>
-        <button class="act btn-back" id="morseTxBack">戻る</button>
+      <svg id="labWaveSvg" viewBox="0 0 400 200" style="width:100%; margin-top:14px; background:#0a1a15; border:1px solid var(--line-dim); border-radius:10px; display:block;"></svg>
+      <div class="sub" style="text-align:left; margin-top:6px; font-size:12px;">
+        上＝送った波形（きれい・常に表示）　下＝ノイズが乗って受信された波形（送信すると現れます）
       </div>
 
-      <!-- 受信 -->
-      <div class="panel hidden" id="morseRxPanel" style="margin-top:16px;">
-        <div class="status-row"><div class="dot" id="dotRxMorse"></div><div class="status-text" id="rxTextMorse">未受信</div></div>
-        <button class="act btn-seek" id="rxBtnMorse">受信開始</button>
-        <button class="act btn-off hidden" id="rxOffBtnMorse">受信終了</button>
+      <div class="chan-title" style="margin:16px 0 6px;">送信ビット（上）→ 受信ビット（下）</div>
+      <div class="modem-bits" id="labTxBits"></div>
+      <div class="modem-bits" id="labRxBits" style="margin-top:8px;"></div>
+      <div class="modem-received" id="labResultText">送信を待っています…</div>
 
-        <div style="margin-top:16px; position:relative;">
-          <div class="modem-energy-row"><div class="modem-energy-label">音の強さ</div><div class="modem-energy-track" style="position:relative;"><div class="modem-energy-fill" id="fillMorseTone"></div><div id="morseThresholdMark" style="position:absolute; top:0; bottom:0; width:2px; background:var(--sig-red); left:0%;"></div></div></div>
-          <div class="sub" style="text-align:right; font-size:11px; margin-top:2px;" id="morseCalibText">受信開始で周囲の音の大きさを自動で測ります</div>
-        </div>
-
-        <div style="text-align:center; margin-top:10px; font-family:var(--font-display); font-size:18px; color:var(--sig-amber); letter-spacing:2px; min-height:26px; word-break:break-all;" id="morseRxPreview"></div>
-        <div class="modem-received" id="morseReceivedVal">受信待ち…</div>
-
-        <button class="act btn-back" id="morseRxReset">受信をリセット</button>
-        <button class="act btn-back" id="morseRxBack">戻る</button>
+      <div class="chan-title" style="margin:16px 0 6px;">誤り対策を試す</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="chan-btn" id="labParityToggle">パリティビット<br><span style="opacity:.8;">誤りを検出する</span></div>
+        <div class="chan-btn" id="labRepeatToggle">3回送信＋多数決<br><span style="opacity:.8;">誤りを訂正する</span></div>
       </div>
+      <div class="notice" id="labParityResult" style="display:none; margin-top:10px;"></div>
+      <div class="notice" id="labRepeatResult" style="display:none; margin-top:10px;"></div>
 
-      <button class="act btn-back" id="morseBack" style="margin-top:16px;">通信メニューに戻る</button>
+      <button class="act btn-back" id="labBack" style="margin-top:16px;">通信メニューに戻る</button>
     </div>
 
   </div>
@@ -975,38 +961,18 @@
   modemTxBack.addEventListener('click', () => { modemTxPanel.classList.add('hidden'); });
   modemRxBack.addEventListener('click', () => { stopModemRx(); modemRxPanel.classList.add('hidden'); });
 
-  const pickMorse = document.getElementById('pickMorse');
-  const morsePanel = document.getElementById('morsePanel');
-  const morseBack = document.getElementById('morseBack');
-  const pickMorseTx = document.getElementById('pickMorseTx');
-  const pickMorseRx = document.getElementById('pickMorseRx');
-  const morseTxPanel = document.getElementById('morseTxPanel');
-  const morseRxPanel = document.getElementById('morseRxPanel');
-  const morseTxBack = document.getElementById('morseTxBack');
-  const morseRxBack = document.getElementById('morseRxBack');
-
-  pickMorse.addEventListener('click', () => {
+  const pickLab = document.getElementById('pickLab');
+  const labPanel = document.getElementById('labPanel');
+  const labBack = document.getElementById('labBack');
+  pickLab.addEventListener('click', () => {
     commRoleSelect.classList.add('hidden');
-    morsePanel.classList.remove('hidden');
+    labPanel.classList.remove('hidden');
+    if(typeof initLab === 'function') initLab();
   });
-  morseBack.addEventListener('click', () => {
-    stopMorseRx();
-    morseTxPanel.classList.add('hidden');
-    morseRxPanel.classList.add('hidden');
-    morsePanel.classList.add('hidden');
+  labBack.addEventListener('click', () => {
+    labPanel.classList.add('hidden');
     commRoleSelect.classList.remove('hidden');
   });
-  pickMorseTx.addEventListener('click', () => {
-    morseTxPanel.classList.remove('hidden');
-    morseRxPanel.classList.add('hidden');
-    updateMorsePreview();
-  });
-  pickMorseRx.addEventListener('click', () => {
-    morseRxPanel.classList.remove('hidden');
-    morseTxPanel.classList.add('hidden');
-  });
-  morseTxBack.addEventListener('click', () => { morseTxPanel.classList.add('hidden'); });
-  morseRxBack.addEventListener('click', () => { stopMorseRx(); morseRxPanel.classList.add('hidden'); });
 
 
   function stopAllSoundAudio(){
@@ -3061,284 +3027,349 @@
     }
   }
 
-  // ============ モールス信号体験（歴史編） ============
-  const MORSE_TABLE = {
-    'A':'.-', 'B':'-...', 'C':'-.-.', 'D':'-..', 'E':'.', 'F':'..-.', 'G':'--.',
-    'H':'....', 'I':'..', 'J':'.---', 'K':'-.-', 'L':'.-..', 'M':'--', 'N':'-.',
-    'O':'---', 'P':'.--.', 'Q':'--.-', 'R':'.-.', 'S':'...', 'T':'-', 'U':'..-',
-    'V':'...-', 'W':'.--', 'X':'-..-', 'Y':'-.--', 'Z':'--..',
-    '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....',
-    '6':'-....','7':'--...','8':'---..','9':'----.'
-  };
-  const MORSE_REVERSE = {};
-  Object.entries(MORSE_TABLE).forEach(([ch, code]) => { MORSE_REVERSE[code] = ch; });
+  // ============ デジタル無線通信 実験室 ============
+  // 8bitのデータを、選んだ変調方式(ASK/FSK/PSK)で波形にし、ノイズを乗せて、
+  // 整合フィルタ（テンプレートとの相関）で復調する。マイク・スピーカーは一切使わず、
+  // すべて数値計算だけで完結するので、環境に左右されず毎回同じように動く。
+  const LAB_SPS = 40;            // 1ビットあたりのサンプル数
+  const LAB_F_ASK = 3;           // ASKの搬送波サイクル数/ビット
+  const LAB_ASK_LOW = 0.25, LAB_ASK_HIGH = 1.0;
+  const LAB_F0_FSK = 3, LAB_F1_FSK = 5; // FSKのビット0用/ビット1用サイクル数
+  const LAB_F_PSK = 3;           // PSKの搬送波サイクル数/ビット
 
-  const MORSE_FREQ = 1800; // 送受信に使う音の高さ（人の声や環境音が少ない帯域に変更）
-  const MORSE_CALIBRATE_MS = 700; // 受信開始直後、周囲の音の大きさを測る時間
-  const MORSE_DEBOUNCE_FRAMES = 2; // ノイズの1コマだけの山でオン/オフを誤判定しないための連続確認回数
+  function labTemplateSample(modType, bit, i){
+    const t = i / LAB_SPS;
+    if(modType === 'ASK'){
+      const amp = bit ? LAB_ASK_HIGH : LAB_ASK_LOW;
+      return amp * Math.sin(2*Math.PI*LAB_F_ASK*t);
+    } else if(modType === 'FSK'){
+      const f = bit ? LAB_F1_FSK : LAB_F0_FSK;
+      return Math.sin(2*Math.PI*f*t);
+    }
+    const sign = bit ? 1 : -1; // PSK
+    return sign * Math.sin(2*Math.PI*LAB_F_PSK*t);
+  }
 
-  function morseCodeToDisplay(code){
-    return code.split('').map(s => s === '.' ? '・' : '－').join('');
+  function labTransmitBit(modType, bit, sigma){
+    const clean = [], noisy = [];
+    for(let i=0;i<LAB_SPS;i++){
+      const c = labTemplateSample(modType, bit, i);
+      clean.push(c);
+      noisy.push(c + sigma*gaussianRandom());
+    }
+    return { clean, noisy };
   }
-  function textToMorseDisplay(text){
-    return text.toUpperCase().split('').map(ch => {
-      if(ch === ' ') return '/';
-      const code = MORSE_TABLE[ch];
-      return code ? morseCodeToDisplay(code) : '';
-    }).filter(s => s !== '').join('　');
+
+  // ASKは振幅(エネルギー)のしきい値判定、FSK/PSKは0用/1用テンプレートとの相関比較（整合フィルタ）
+  function labDemodBit(modType, noisySamples){
+    if(modType === 'ASK'){
+      let energy = 0;
+      for(let i=0;i<LAB_SPS;i++) energy += noisySamples[i]*Math.sin(2*Math.PI*LAB_F_ASK*(i/LAB_SPS));
+      energy = energy / (LAB_SPS/2);
+      const threshold = (LAB_ASK_LOW + LAB_ASK_HIGH)/2;
+      return energy >= threshold ? 1 : 0;
+    }
+    let corr0=0, corr1=0;
+    for(let i=0;i<LAB_SPS;i++){
+      corr0 += noisySamples[i]*labTemplateSample(modType,0,i);
+      corr1 += noisySamples[i]*labTemplateSample(modType,1,i);
+    }
+    return corr1 > corr0 ? 1 : 0;
   }
-  // 送信する音のオン/オフの時間割りを作る（PARIS方式：トン=1単位、ツー=3単位、
-  // 符号内の間隔=1単位、文字の間隔=3単位、単語の間隔=7単位）
-  function textToTiming(text, wpm){
-    const T = 1200/wpm; // 1単位あたりのミリ秒
-    const seq = [];
-    text.toUpperCase().split('').forEach((ch) => {
-      if(ch === ' '){
-        seq.push({on:false, duration: T*7});
-        return;
-      }
-      const code = MORSE_TABLE[ch];
-      if(!code) return;
-      code.split('').forEach((sym, i) => {
-        if(i>0) seq.push({on:false, duration:T});
-        seq.push({on:true, duration: sym === '.' ? T : T*3});
+
+  function labComputeParity(bits){ return bits.reduce((a,b)=>a^b, 0); }
+  function labMajorityVote(a,b,c){ return (a+b+c) >= 2 ? 1 : 0; }
+
+  const LAB_PAD = 15, LAB_W = 400, LAB_TOPY = 55, LAB_BOTY = 155, LAB_SCALE = 28, LAB_BITS = 8;
+  const LAB_SLOTW = (LAB_W - LAB_PAD*2) / LAB_BITS;
+  const LAB_STEP_MS = 130; // 送信・受信アニメーションの1ビットあたりの間隔
+
+  let labModType = 'ASK';
+  let labParityOn = false;
+  let labRepeatOn = false;
+  let labInitialized = false;
+  let labSending = false;
+
+  function labCleanSamples(modType, bit){
+    const arr = [];
+    for(let i=0;i<LAB_SPS;i++) arr.push(labTemplateSample(modType, bit, i));
+    return arr;
+  }
+
+  function initLab(){
+    labUpdatePreview();
+    if(labInitialized) return;
+    labInitialized = true;
+
+    const labValueSlider = document.getElementById('labValueSlider');
+    const labValueDisplay = document.getElementById('labValueDisplay');
+    const labBinaryDisplay = document.getElementById('labBinaryDisplay');
+    const labModASK = document.getElementById('labModASK');
+    const labModFSK = document.getElementById('labModFSK');
+    const labModPSK = document.getElementById('labModPSK');
+    const labSigmaSlider = document.getElementById('labSigmaSlider');
+    const labSigmaVal = document.getElementById('labSigmaVal');
+    const labSendBtn = document.getElementById('labSendBtn');
+    const labParityToggle = document.getElementById('labParityToggle');
+    const labRepeatToggle = document.getElementById('labRepeatToggle');
+
+    function setLabMod(mod){
+      labModType = mod;
+      labModASK.classList.toggle('selected', mod==='ASK');
+      labModFSK.classList.toggle('selected', mod==='FSK');
+      labModPSK.classList.toggle('selected', mod==='PSK');
+      labUpdatePreview();
+    }
+    labModASK.addEventListener('click', () => setLabMod('ASK'));
+    labModFSK.addEventListener('click', () => setLabMod('FSK'));
+    labModPSK.addEventListener('click', () => setLabMod('PSK'));
+
+    labValueSlider.addEventListener('input', () => {
+      const v = parseInt(labValueSlider.value, 10);
+      labValueDisplay.textContent = v;
+      labBinaryDisplay.textContent = v.toString(2).padStart(8,'0');
+      labUpdatePreview();
+    });
+    labSigmaSlider.addEventListener('input', () => {
+      labSigmaVal.textContent = (parseInt(labSigmaSlider.value,10)/100).toFixed(2);
+    });
+    labSendBtn.addEventListener('click', labStartSend);
+    labParityToggle.addEventListener('click', () => {
+      labParityOn = !labParityOn;
+      labParityToggle.classList.toggle('selected', labParityOn);
+    });
+    labRepeatToggle.addEventListener('click', () => {
+      labRepeatOn = !labRepeatOn;
+      labRepeatToggle.classList.toggle('selected', labRepeatOn);
+    });
+  }
+
+  function labSvgEl(tag, attrs){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+    return el;
+  }
+
+  // 目盛り線・送信波形（常に表示）を描き、受信波形用の空パスを用意しておく
+  function drawLabSkeletonAndClean(cleanPerBit){
+    const svg = document.getElementById('labWaveSvg');
+    svg.innerHTML = '';
+    for(let i=0;i<=LAB_BITS;i++){
+      const x = LAB_PAD + i*LAB_SLOTW;
+      svg.appendChild(labSvgEl('line', {x1:x,y1:10,x2:x,y2:95, stroke:'var(--line-dim)', 'stroke-width':1, 'stroke-dasharray':'2,3'}));
+      svg.appendChild(labSvgEl('line', {x1:x,y1:110,x2:x,y2:195, stroke:'var(--line-dim)', 'stroke-width':1, 'stroke-dasharray':'2,3'}));
+    }
+    svg.appendChild(labSvgEl('text', {x:LAB_PAD, y:12, 'font-size':9, fill:'var(--text-dim)'})).textContent = '送信（きれい）';
+    svg.appendChild(labSvgEl('text', {x:LAB_PAD, y:118, 'font-size':9, fill:'var(--text-dim)'})).textContent = '受信（送信すると現れます）';
+
+    let dClean = '';
+    cleanPerBit.forEach((samples, bi) => {
+      samples.forEach((v, i) => {
+        const x = LAB_PAD + bi*LAB_SLOTW + (i/LAB_SPS)*LAB_SLOTW;
+        const y = LAB_TOPY - v*LAB_SCALE;
+        dClean += (bi===0 && i===0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
       });
-      seq.push({on:false, duration:T*3});
     });
-    return seq;
+    svg.appendChild(labSvgEl('path', {d:dClean, fill:'none', stroke:'var(--sig-teal)', 'stroke-width':1.4}));
+
+    const noisyPath = labSvgEl('path', {d:'', fill:'none', stroke:'var(--text-main)', 'stroke-width':1.2, opacity:'0.85'});
+    noisyPath.setAttribute('id', 'labNoisyPath');
+    svg.appendChild(noisyPath);
   }
 
-  const morseTextInput = document.getElementById('morseTextInput');
-  const morsePreview = document.getElementById('morsePreview');
-  const morseSendBtn = document.getElementById('morseSendBtn');
-  const morseWpmSlider = document.getElementById('morseWpmSlider');
-  const morseWpmVal = document.getElementById('morseWpmVal');
-
-  function currentMorseWpm(){ return parseInt(morseWpmSlider.value, 10); }
-  function updateMorsePreview(){
-    const text = morseTextInput.value || '';
-    morsePreview.textContent = textToMorseDisplay(text) || '（文字を入力してください）';
-  }
-  morseTextInput.addEventListener('input', updateMorsePreview);
-  morseWpmSlider.addEventListener('input', () => { morseWpmVal.textContent = currentMorseWpm(); });
-  updateMorsePreview();
-
-  function sendMorseAudio(text, wpm){
-    const ctx = getAudioCtx();
-    const startDelay = 0.08;
-    const t0 = ctx.currentTime + startDelay;
-    const gainLevel = 0.7;
-    const seq = textToTiming(text, wpm);
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(MORSE_FREQ, t0);
-    osc.connect(gain).connect(ctx.destination);
-    gain.gain.setValueAtTime(0, t0);
-
-    let t = t0;
-    seq.forEach(ev => {
-      const dur = ev.duration/1000;
-      if(ev.on){
-        const ramp = Math.min(0.01, dur*0.2);
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(gainLevel, t + ramp);
-        gain.gain.setValueAtTime(gainLevel, t + dur - ramp);
-        gain.gain.linearRampToValueAtTime(0, t + dur);
-      }
-      t += dur;
+  // 受信波形を1ビットぶんずつ書き足していく（送信アニメーション用）
+  function labAppendNoisySegment(bitIndex, noisySamples){
+    const path = document.getElementById('labNoisyPath');
+    if(!path) return;
+    let seg = '';
+    noisySamples.forEach((v, i) => {
+      const x = LAB_PAD + bitIndex*LAB_SLOTW + (i/LAB_SPS)*LAB_SLOTW;
+      const y = LAB_BOTY - v*LAB_SCALE;
+      const isVeryFirst = (bitIndex===0 && i===0);
+      seg += (isVeryFirst ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
     });
-    const tEnd = t;
-
-    osc.start(t0);
-    osc.stop(tEnd + 0.05);
-    osc.onended = () => { try{ osc.disconnect(); gain.disconnect(); }catch(e){} };
+    path.setAttribute('d', path.getAttribute('d') + seg);
   }
 
-  morseSendBtn.addEventListener('click', () => {
-    const text = (morseTextInput.value || '').toUpperCase();
-    if(!text.trim()) return;
-    const wpm = currentMorseWpm();
-    sendMorseAudio(text, wpm);
-    log('モールス信号: 「' + text + '」を送信（' + wpm + 'WPM）');
-  });
-
-  // ---- 受信 ----
-  const dotRxMorse = document.getElementById('dotRxMorse');
-  const rxTextMorse = document.getElementById('rxTextMorse');
-  const rxBtnMorse = document.getElementById('rxBtnMorse');
-  const rxOffBtnMorse = document.getElementById('rxOffBtnMorse');
-  const fillMorseTone = document.getElementById('fillMorseTone');
-  const morseThresholdMark = document.getElementById('morseThresholdMark');
-  const morseCalibText = document.getElementById('morseCalibText');
-  const morseRxPreview = document.getElementById('morseRxPreview');
-  const morseReceivedVal = document.getElementById('morseReceivedVal');
-  const morseRxReset = document.getElementById('morseRxReset');
-
-  let analyserMorse = null, micStreamMorse = null, micSourceMorse = null, rxRunningMorse = false;
-  let morseToneOn = false;
-  let morseLastTransitionTime = 0;
-  let morseCurrentSymbols = '';
-  let morseDecodedText = '';
-  let morseLetterFinalized = true;
-  let morseWordGapAdded = true;
-
-  // ---- しきい値の自動キャリブレーション（周囲の音の大きさに合わせる） ----
-  let morseCalibrating = false;
-  let morseCalibStartTime = 0;
-  let morseCalibMaxPeak = 0;
-  let morseThreshold = 60; // キャリブレーション前の仮の初期値
-
-  // ---- 1コマのノイズで誤判定しないためのデバウンス ----
-  let morsePendingState = false;
-  let morsePendingCount = 0;
-
-  function setMorseThresholdMark(){
-    morseThresholdMark.style.left = Math.min(100, (morseThreshold/255)*100) + '%';
-  }
-  setMorseThresholdMark();
-
-  function resetMorseReceiveState(){
-    morseToneOn = false;
-    morseLastTransitionTime = performance.now();
-    morseCurrentSymbols = '';
-    morseDecodedText = '';
-    morseLetterFinalized = true;
-    morseWordGapAdded = true;
-    morsePendingState = false;
-    morsePendingCount = 0;
-    morseRxPreview.textContent = '';
-    morseReceivedVal.textContent = '受信待ち…';
-    rxTextMorse.textContent = rxRunningMorse ? '待機中…（信号を聞いています）' : '未受信';
-  }
-  morseRxReset.addEventListener('click', () => { resetMorseReceiveState(); log('モールス信号: 受信をリセット'); });
-
-  async function startMorseRx(){
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      rxTextMorse.textContent = 'マイクが使用できません（httpsで開いているか確認）';
-      return;
-    }
-    try{
-      micStreamMorse = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
-      const ctx = getAudioCtx();
-      micSourceMorse = ctx.createMediaStreamSource(micStreamMorse);
-      analyserMorse = ctx.createAnalyser();
-      analyserMorse.fftSize = 4096;
-      micSourceMorse.connect(analyserMorse);
-
-      rxRunningMorse = true;
-      dotRxMorse.classList.add('on');
-      rxBtnMorse.classList.add('hidden');
-      rxOffBtnMorse.classList.remove('hidden');
-      resetMorseReceiveState();
-
-      // 受信開始直後は、まだ何も送信しないでもらい、周囲の音の大きさ（ノイズの床）を測る
-      morseCalibrating = true;
-      morseCalibStartTime = performance.now();
-      morseCalibMaxPeak = 0;
-      rxTextMorse.textContent = '周囲の音を測定中…（このタイミングでは送信しないでください）';
-      morseCalibText.textContent = 'キャリブレーション中…';
-
-      log('モールス信号: 受信を開始（周囲の音を測定中）');
-      requestAnimationFrame(tickMorseRx);
-    } catch(err){
-      rxTextMorse.textContent = 'エラー: ' + err.message;
-      log('マイク許可の取得に失敗: ' + err.message);
-    }
-  }
-  function stopMorseRx(){
-    rxRunningMorse = false;
-    morseCalibrating = false;
-    if(micStreamMorse){ micStreamMorse.getTracks().forEach(t => t.stop()); micStreamMorse = null; }
-    if(micSourceMorse){ micSourceMorse.disconnect(); micSourceMorse = null; }
-    analyserMorse = null;
-    dotRxMorse.classList.remove('on');
-    rxTextMorse.textContent = '未受信';
-    rxBtnMorse.classList.remove('hidden');
-    rxOffBtnMorse.classList.add('hidden');
-    fillMorseTone.style.width = '0%';
-  }
-  rxBtnMorse.addEventListener('click', startMorseRx);
-  rxOffBtnMorse.addEventListener('click', stopMorseRx);
-
-  function finalizeMorseLetter(){
-    if(morseCurrentSymbols){
-      const ch = MORSE_REVERSE[morseCurrentSymbols] || '?';
-      morseDecodedText += ch;
-      morseCurrentSymbols = '';
-      morseReceivedVal.textContent = '受信中: ' + morseDecodedText;
-    }
-  }
-
-  // 音のオン/オフの継続時間から「トンかツーか」「文字の切れ目か」「単語の切れ目か」を判定していく。
-  // 通常モデムのような固定長ビットと違い、モールスは長さそのものが意味を持つ可変長の符号。
-  function tickMorseRx(){
-    if(!rxRunningMorse || !analyserMorse) return;
-    const data = new Uint8Array(analyserMorse.frequencyBinCount);
-    analyserMorse.getByteFrequencyData(data);
-    const peak = peakAtFreq(analyserMorse, data, MORSE_FREQ);
-    fillMorseTone.style.width = Math.min(100, (peak/255)*100) + '%';
-
-    const now = performance.now();
-
-    // ---- キャリブレーション中：周囲の音の最大値を測っておき、そこから少し上をしきい値にする ----
-    if(morseCalibrating){
-      if(peak > morseCalibMaxPeak) morseCalibMaxPeak = peak;
-      if(now - morseCalibStartTime >= MORSE_CALIBRATE_MS){
-        morseThreshold = Math.max(30, morseCalibMaxPeak * 1.6, morseCalibMaxPeak + 18);
-        morseThreshold = Math.min(morseThreshold, 200); // 上げすぎて何も検出できなくなるのを防ぐ
-        setMorseThresholdMark();
-        morseCalibrating = false;
-        morseCalibText.textContent = 'しきい値: ' + Math.round(morseThreshold) + '（周囲の音: ' + Math.round(morseCalibMaxPeak) + '）';
-        rxTextMorse.textContent = '準備完了！信号を送ってください';
-        morseLastTransitionTime = now;
-        log('モールス信号: キャリブレーション完了（しきい値=' + Math.round(morseThreshold) + '）');
+  function labRenderBitsRow(containerId, bits, compareBits){
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    bits.forEach((b,i) => {
+      const d = document.createElement('div');
+      d.className = 'modem-bit';
+      d.textContent = b;
+      if(compareBits){
+        d.classList.add(b === compareBits[i] ? 'match' : 'err');
+      } else {
+        d.classList.add(b ? 'on' : 'off');
       }
-      requestAnimationFrame(tickMorseRx);
-      return;
+      container.appendChild(d);
+    });
+  }
+
+  function labInitRxPlaceholder(){
+    const container = document.getElementById('labRxBits');
+    container.innerHTML = '';
+    for(let i=0;i<LAB_BITS;i++){
+      const d = document.createElement('div');
+      d.className = 'modem-bit';
+      d.textContent = '?';
+      container.appendChild(d);
+    }
+  }
+
+  function labRevealRxBit(i, value, isMatch){
+    const container = document.getElementById('labRxBits');
+    const el = container.children[i];
+    if(!el) return;
+    el.textContent = value;
+    el.classList.add(isMatch ? 'match' : 'err');
+  }
+
+  function labFlashTxBit(i){
+    const container = document.getElementById('labTxBits');
+    Array.from(container.children).forEach(el => el.classList.remove('active'));
+    if(container.children[i]) container.children[i].classList.add('active');
+  }
+
+  // 設定（数値・変調方式）を変えるたびに呼ぶ：ノイズは乗せず、送信側の見た目だけ更新する
+  function labUpdatePreview(){
+    const labValueSlider = document.getElementById('labValueSlider');
+    if(!labValueSlider) return;
+    const value = parseInt(labValueSlider.value, 10);
+    const bits = value.toString(2).padStart(8,'0').split('').map(Number);
+    const cleanPerBit = bits.map(b => labCleanSamples(labModType, b));
+
+    drawLabSkeletonAndClean(cleanPerBit);
+    labRenderBitsRow('labTxBits', bits, null);
+    labInitRxPlaceholder();
+    document.getElementById('labResultText').textContent = '送信を待っています…';
+    document.getElementById('labParityResult').style.display = 'none';
+    document.getElementById('labRepeatResult').style.display = 'none';
+    document.getElementById('labStatusText').textContent = '設定を選んで「送信する」を押してください';
+  }
+
+  // 「送信する」ボタン：ここで初めてノイズを乗せた実際の送受信を計算し、
+  // ビットが1つずつ送信→受信されていく様子をアニメーションで見せる
+  function labStartSend(){
+    if(labSending) return;
+    const labValueSlider = document.getElementById('labValueSlider');
+    const labSigmaSlider = document.getElementById('labSigmaSlider');
+    const labSendBtn = document.getElementById('labSendBtn');
+    const labDot = document.getElementById('labDot');
+    const labStatusText = document.getElementById('labStatusText');
+    const labResultText = document.getElementById('labResultText');
+    const labParityResult = document.getElementById('labParityResult');
+    const labRepeatResult = document.getElementById('labRepeatResult');
+
+    const value = parseInt(labValueSlider.value, 10);
+    const sigma = parseInt(labSigmaSlider.value, 10)/100;
+    const bits = value.toString(2).padStart(8,'0').split('').map(Number);
+
+    const cleanPerBit = [], noisyPerBit = [], rxBits = [];
+    bits.forEach(b => {
+      const { clean, noisy } = labTransmitBit(labModType, b, sigma);
+      cleanPerBit.push(clean);
+      noisyPerBit.push(noisy);
+      rxBits.push(labDemodBit(labModType, noisy));
+    });
+
+    labSending = true;
+    labSendBtn.disabled = true;
+    labSendBtn.style.opacity = '0.6';
+    labDot.classList.add('on');
+    drawLabSkeletonAndClean(cleanPerBit);
+    labRenderBitsRow('labTxBits', bits, null);
+    labInitRxPlaceholder();
+    labResultText.textContent = '送信中…';
+    labParityResult.style.display = 'none';
+    labRepeatResult.style.display = 'none';
+    labStatusText.textContent = '送信中…';
+
+    log('実験室: 送信開始（' + labModType + ', σ=' + sigma.toFixed(2) + '）');
+
+    for(let i=0;i<LAB_BITS;i++){
+      setTimeout(() => { labFlashTxBit(i); }, i*LAB_STEP_MS);
     }
 
-    // ---- 1コマだけのノイズの山で誤判定しないよう、連続で同じ状態が続いたときだけオン/オフを確定する ----
-    const rawIsOn = peak >= morseThreshold;
-    if(rawIsOn === morsePendingState){
-      morsePendingCount++;
+    const phase1End = LAB_BITS*LAB_STEP_MS;
+    setTimeout(() => {
+      const container = document.getElementById('labTxBits');
+      Array.from(container.children).forEach(el => el.classList.remove('active'));
+      labStatusText.textContent = '受信中…';
+    }, phase1End);
+
+    for(let i=0;i<LAB_BITS;i++){
+      setTimeout(() => {
+        labAppendNoisySegment(i, noisyPerBit[i]);
+        labRevealRxBit(i, rxBits[i], rxBits[i] === bits[i]);
+      }, phase1End + i*LAB_STEP_MS);
+    }
+
+    const phase2End = phase1End + LAB_BITS*LAB_STEP_MS;
+    setTimeout(() => {
+      labFinishSend(value, bits, rxBits, sigma);
+      labSending = false;
+      labSendBtn.disabled = false;
+      labSendBtn.style.opacity = '1';
+      labDot.classList.remove('on');
+    }, phase2End + 150);
+  }
+
+  function labFinishSend(value, bits, rxBits, sigma){
+    const labResultText = document.getElementById('labResultText');
+    const labStatusText = document.getElementById('labStatusText');
+    const labParityResult = document.getElementById('labParityResult');
+    const labRepeatResult = document.getElementById('labRepeatResult');
+
+    const errCount = bits.filter((b,i) => b !== rxBits[i]).length;
+    const rxValue = parseInt(rxBits.join(''), 2);
+    if(errCount === 0){
+      labResultText.textContent = '受信成功！ 送信=' + value + ' → 受信=' + rxValue + '（誤りなし）';
     } else {
-      morsePendingState = rawIsOn;
-      morsePendingCount = 1;
+      labResultText.textContent = '送信=' + value + ' → 受信=' + rxValue + '（' + errCount + 'ビット化けました）';
     }
-    const isOn = (morsePendingCount >= MORSE_DEBOUNCE_FRAMES) ? morsePendingState : morseToneOn;
+    labStatusText.textContent = '受信完了！';
 
-    const unit = 1200/currentMorseWpm();
-
-    if(isOn !== morseToneOn){
-      const elapsed = now - morseLastTransitionTime;
-      if(morseToneOn){
-        // 音が鳴っていた→止まった：鳴っていた長さから「トン」か「ツー」かを判定
-        const symbol = elapsed < unit*2 ? '.' : '-';
-        morseCurrentSymbols += symbol;
-        morseRxPreview.textContent = morseCodeToDisplay(morseCurrentSymbols);
-        morseLetterFinalized = false;
-        morseWordGapAdded = false;
-        rxTextMorse.textContent = '受信中…';
+    if(labParityOn){
+      const txParity = labComputeParity(bits);
+      const { noisy: parityNoisy } = labTransmitBit(labModType, txParity, sigma);
+      const rxParity = labDemodBit(labModType, parityNoisy);
+      const expectedParity = labComputeParity(rxBits);
+      const mismatch = (expectedParity !== rxParity);
+      labParityResult.style.display = 'block';
+      if(mismatch){
+        labParityResult.innerHTML = '<b>パリティ検査：誤りを検出しました。</b>受信側は「どこかが化けている」と気づけます（どこかまでは分かりません）。';
+      } else if(errCount === 0){
+        labParityResult.innerHTML = '<b>パリティ検査：異常なし。</b>実際に誤りもありませんでした。';
+      } else {
+        labParityResult.innerHTML = '<b>パリティ検査：異常なし、と判定。</b>でも実際は' + errCount + 'ビット化けています。偶数個の誤りはパリティでは見抜けません。';
       }
-      morseToneOn = isOn;
-      morseLastTransitionTime = now;
-    } else if(!isOn){
-      const elapsedOff = now - morseLastTransitionTime;
-      if(!morseLetterFinalized && elapsedOff >= unit*2){
-        finalizeMorseLetter();
-        morseLetterFinalized = true;
-        morseRxPreview.textContent = '';
-      }
-      if(!morseWordGapAdded && elapsedOff >= unit*6){
-        morseDecodedText += ' ';
-        morseReceivedVal.textContent = '受信中: ' + morseDecodedText;
-        morseWordGapAdded = true;
-      }
+    } else {
+      labParityResult.style.display = 'none';
     }
 
-    requestAnimationFrame(tickMorseRx);
+    if(labRepeatOn){
+      const correctedBits = bits.map(b => {
+        const d1 = labDemodBit(labModType, labTransmitBit(labModType, b, sigma).noisy);
+        const d2 = labDemodBit(labModType, labTransmitBit(labModType, b, sigma).noisy);
+        const d3 = labDemodBit(labModType, labTransmitBit(labModType, b, sigma).noisy);
+        return labMajorityVote(d1, d2, d3);
+      });
+      const correctedErr = bits.filter((b,i) => b !== correctedBits[i]).length;
+      labRenderBitsRow('labRxBits', correctedBits, bits);
+      labRepeatResult.style.display = 'block';
+      labRepeatResult.innerHTML = '<b>多数決訂正後：</b>1回だけの受信では' + errCount + 'ビットの誤りでしたが、' +
+        '同じビットを3回送って多数決した結果、誤りは' + correctedErr + 'ビットになりました' +
+        '（3倍の時間がかかる代わりに、確実さが上がります）。';
+      const correctedValue = parseInt(correctedBits.join(''), 2);
+      labResultText.textContent = '送信=' + value + ' → 多数決後の受信=' + correctedValue +
+        '（' + correctedErr + 'ビット化け／1回受信では' + errCount + 'ビット化け）';
+    } else {
+      labRepeatResult.style.display = 'none';
+    }
+
+    log('実験室: 受信完了 → ' + value + '→' + rxValue + '（誤り' + errCount + 'ビット）');
   }
 })();
 </script>
