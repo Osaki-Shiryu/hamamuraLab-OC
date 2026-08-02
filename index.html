@@ -706,9 +706,20 @@
         数値を8bitの2進数に変換し、音の高さの切り替え（周波数偏移変調・FSK）で実際に送受信します。
         2台のスマホで「送信」「受信」役を分けて試してみましょう。
       </div>
-      <div class="notice">
+
+      <div class="chan-title" style="margin-bottom:6px;">送り方を選ぶ</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="chan-btn selected" id="modemModeNormalBtn">通常モード<br><span style="opacity:.8;">1ビットずつ順番に（約2.3秒）</span></div>
+        <div class="chan-btn" id="modemModeFastBtn">高速モード<br><span style="opacity:.8;">8ビット同時に（約0.7秒）</span></div>
+      </div>
+
+      <div class="notice" id="modemNoticeNormal">
         <b>使うトーン：</b> 同期音(プリアンブル) 1800Hz／ビット0 = 2400Hz／ビット1 = 3000Hz。
         1ビットあたり250ms。周囲が静かな場所・スマホの音量を上げた状態で試してください。
+      </div>
+      <div class="notice hidden" id="modemNoticeFast">
+        <b>使うトーン：</b> 同期音(プリアンブル) 1500Hz。8つのビットそれぞれに専用の周波数（2100〜4900Hz、8チャンネル）を割り当て、
+        「1」のビットの音だけを<b>全部同時に</b>1回だけ鳴らします。8回に分けず1回で送るので、通常モードより高速です。
       </div>
 
       <div class="role-grid">
@@ -743,11 +754,13 @@
         <button class="act btn-seek" id="rxBtnM">受信開始</button>
         <button class="act btn-off hidden" id="rxOffBtnM">受信終了</button>
 
-        <div style="margin-top:16px;">
+        <div style="margin-top:16px;" id="modemEnergyNormal">
           <div class="modem-energy-row"><div class="modem-energy-label">同期音</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillPreamble"></div></div></div>
           <div class="modem-energy-row"><div class="modem-energy-label">ビット0</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillBit0"></div></div></div>
           <div class="modem-energy-row"><div class="modem-energy-label">ビット1</div><div class="modem-energy-track"><div class="modem-energy-fill" id="fillBit1"></div></div></div>
         </div>
+
+        <div style="margin-top:16px;" id="modemEnergyFast"></div>
 
         <div class="modem-bits" id="modemRxBits"></div>
 
@@ -780,10 +793,10 @@
   const HOT_THRESHOLD   = 120;  // 旧150→120
   const WARM_THRESHOLD  = 80;   // 旧100→80
   const COOL_THRESHOLD  = 40;   // 旧50→40
-  const FOUND_HOLD_MS   = 10000; // 10秒キープで発見
+  const FOUND_HOLD_MS   = 3000; // 3秒キープで発見（旧10秒→3秒に短縮）
 
   const SIMUL_THRESHOLD = 28;   // 同時モード：検出中とみなすしきい値（55→28にさらに緩和）
-  const SIMUL_HOLD_MS   = 10000; // 10秒キープで実績解除
+  const SIMUL_HOLD_MS   = 3000; // 3秒キープで実績解除（旧10秒→3秒に短縮）
 
   // ---------- DOM: 共通 ----------
   const roleSelect = document.getElementById('roleSelect');
@@ -1166,7 +1179,7 @@
       gaugeLabel.textContent = 'キープ中…はなさないで！';
       gaugeLabel.style.color = 'var(--sig-green)';
     } else {
-      // 途切れてもすぐには0に戻さず、FOUND_HOLD_MSと同じ時間（約10秒）かけてゆっくり戻る
+      // 途切れてもすぐには0に戻さず、FOUND_HOLD_MSと同じ時間（約3秒）かけてゆっくり戻る
       holdProgressO = Math.max(0, holdProgressO - dt);
       gaugeLabel.textContent = 'さがし中…';
       gaugeLabel.style.color = 'var(--text-dim)';
@@ -1353,7 +1366,7 @@
           }
         }
       } else {
-        // 条件を満たさなくなってもすぐ0にはせず、SIMUL_HOLD_MSと同じ時間（約10秒）かけて戻す
+        // 条件を満たさなくなってもすぐ0にはせず、SIMUL_HOLD_MSと同じ時間（約3秒）かけて戻す
         tierHoldProgress[t.id] = Math.max(0, tierHoldProgress[t.id] - dt);
       }
     });
@@ -2514,6 +2527,16 @@
   const MODEM_BITS = 8;
   const MODEM_DETECT_THRESHOLD = 90; // 0-255スケール。検出できない/誤検出が多い場合はここを調整
 
+  // ---- 高速モード：8bit分の専用チャンネルを同時に鳴らして1回で送る ----
+  // 「色んなチャンネルがある」なら、1ビットずつ順番に送らなくても、ビットごとに専用の周波数を
+  // 割り当てて「1」のところだけ同時に鳴らせば、1回の送信で8ビット全部を運べる、という発想。
+  const MODEM_PARALLEL_PREAMBLE_FREQ = 1500;
+  const MODEM_PARALLEL_BIT_FREQS = [2100, 2500, 2900, 3300, 3700, 4100, 4500, 4900]; // bit0(MSB)〜bit7(LSB)専用チャンネル（通常モードの周波数とは重ならない値に設定）
+  const MODEM_PARALLEL_CHORD_MS = 350; // 8ビット分を同時に鳴らす1回ぶんの長さ
+  const MODEM_PARALLEL_DETECT_THRESHOLD = 65; // 同時に鳴らす分1音あたりが小さくなるので、通常モードより低めに設定
+
+  let modemMode = 'normal'; // 'normal'（直列）｜'fast'（並列・高速）
+
   // 1つの発振器の周波数を時間に沿って切り替えてFSK送信する。
   // トーンごとに別々のオシレーター/ゲインノードを作って管理すると、後半のノードの
   // 開始・終了タイミングがズレて音が途切れることがあったため、単一ノードに統一した。
@@ -2548,11 +2571,79 @@
     return t0;
   }
 
+  // 8ビット分の専用チャンネルのうち「1」のものだけを同時に鳴らす（並列・高速モード）。
+  // 同期音のあと、1回のコード（和音）だけで8ビット全部を送り終える。
+  function sendModemParallel(bits){
+    const ctx = getAudioCtx();
+    const startDelay = 0.08;
+    const t0 = ctx.currentTime + startDelay;
+
+    // 同期音（プリアンブル）
+    const preOsc = ctx.createOscillator();
+    const preGain = ctx.createGain();
+    preOsc.type = 'sine';
+    preOsc.frequency.setValueAtTime(MODEM_PARALLEL_PREAMBLE_FREQ, t0);
+    preOsc.connect(preGain).connect(ctx.destination);
+    const tChordStart = t0 + MODEM_PREAMBLE_MS/1000;
+    preGain.gain.setValueAtTime(0, t0);
+    preGain.gain.linearRampToValueAtTime(0.7, t0 + 0.02);
+    preGain.gain.setValueAtTime(0.7, tChordStart - 0.03);
+    preGain.gain.linearRampToValueAtTime(0, tChordStart);
+    preOsc.start(t0);
+    preOsc.stop(tChordStart + 0.05);
+    preOsc.onended = () => { try{ preOsc.disconnect(); preGain.disconnect(); }catch(e){} };
+
+    // 「1」のビットのチャンネルだけを同時に鳴らす（同時に鳴る音の数で音量を調整し、割れを防ぐ）
+    const activeCount = bits.filter(b => b).length;
+    const tChordEnd = tChordStart + MODEM_PARALLEL_CHORD_MS/1000;
+    const perToneGain = activeCount > 0 ? Math.min(0.7, 0.9/activeCount) : 0;
+
+    bits.forEach((b, i) => {
+      if(!b) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(MODEM_PARALLEL_BIT_FREQS[i], tChordStart);
+      osc.connect(gain).connect(ctx.destination);
+      gain.gain.setValueAtTime(0, tChordStart);
+      gain.gain.linearRampToValueAtTime(perToneGain, tChordStart + 0.02);
+      gain.gain.setValueAtTime(perToneGain, tChordEnd - 0.03);
+      gain.gain.linearRampToValueAtTime(0, tChordEnd);
+      osc.start(tChordStart);
+      osc.stop(tChordEnd + 0.05);
+      osc.onended = () => { try{ osc.disconnect(); gain.disconnect(); }catch(e){} };
+    });
+
+    return t0;
+  }
+
   const modemValueSlider = document.getElementById('modemValueSlider');
   const modemValueDisplay = document.getElementById('modemValueDisplay');
   const modemBinaryDisplay = document.getElementById('modemBinaryDisplay');
   const modemTxBits = document.getElementById('modemTxBits');
   const modemSendBtn = document.getElementById('modemSendBtn');
+
+  const modemModeNormalBtn = document.getElementById('modemModeNormalBtn');
+  const modemModeFastBtn = document.getElementById('modemModeFastBtn');
+  const modemNoticeNormal = document.getElementById('modemNoticeNormal');
+  const modemNoticeFast = document.getElementById('modemNoticeFast');
+  const modemEnergyNormal = document.getElementById('modemEnergyNormal');
+  const modemEnergyFast = document.getElementById('modemEnergyFast');
+
+  function setModemMode(mode){
+    if(modemMode === mode) return;
+    modemMode = mode;
+    modemModeNormalBtn.classList.toggle('selected', mode === 'normal');
+    modemModeFastBtn.classList.toggle('selected', mode === 'fast');
+    modemNoticeNormal.classList.toggle('hidden', mode !== 'normal');
+    modemNoticeFast.classList.toggle('hidden', mode !== 'fast');
+    modemEnergyNormal.classList.toggle('hidden', mode !== 'normal');
+    modemEnergyFast.classList.toggle('hidden', mode !== 'fast');
+    resetModemReceiveState();
+    log('音声モデム: 送り方を「' + (mode === 'fast' ? '高速モード（並列）' : '通常モード（直列）') + '」に切り替え');
+  }
+  modemModeNormalBtn.addEventListener('click', () => setModemMode('normal'));
+  modemModeFastBtn.addEventListener('click', () => setModemMode('fast'));
 
   function valueToBits(value){
     return value.toString(2).padStart(MODEM_BITS, '0').split('').map(Number);
@@ -2576,24 +2667,33 @@
   modemSendBtn.addEventListener('click', () => {
     const value = parseInt(modemValueSlider.value, 10);
     const bits = valueToBits(value);
-    const ctx = getAudioCtx();
-    const startDelay = 0.08;
-
-    sendModemFSK(bits);
-
-    // UI上でもビットが光るタイミングを、実際の再生タイミングに合わせて表示する
     const bitEls = modemTxBits.querySelectorAll('.modem-bit');
     bitEls.forEach(el => el.classList.remove('on','off','active'));
-    const baseDelayMs = startDelay*1000 + MODEM_PREAMBLE_MS;
-    bits.forEach((b, i) => {
-      setTimeout(() => {
-        bitEls.forEach(el => el.classList.remove('active'));
-        bitEls[i].classList.add('active', b ? 'on' : 'off');
-      }, baseDelayMs + i*MODEM_BIT_MS);
-    });
-    setTimeout(() => { bitEls.forEach(el => el.classList.remove('active')); }, baseDelayMs + bits.length*MODEM_BIT_MS + 50);
 
-    log('音声モデム: ' + value + '（2進数 ' + bits.join('') + '）を送信');
+    if(modemMode === 'fast'){
+      const startDelay = 0.08;
+      sendModemParallel(bits);
+      // 並列モードでは、プリアンブルのあと8ビット全部が同時に光る
+      const baseDelayMs = startDelay*1000 + MODEM_PREAMBLE_MS;
+      setTimeout(() => {
+        bits.forEach((b, i) => { bitEls[i].classList.add('active', b ? 'on' : 'off'); });
+      }, baseDelayMs);
+      setTimeout(() => { bitEls.forEach(el => el.classList.remove('active')); }, baseDelayMs + MODEM_PARALLEL_CHORD_MS + 50);
+      log('音声モデム（高速）: ' + value + '（2進数 ' + bits.join('') + '）を並列送信');
+    } else {
+      const startDelay = 0.08;
+      sendModemFSK(bits);
+      // UI上でもビットが光るタイミングを、実際の再生タイミングに合わせて表示する
+      const baseDelayMs = startDelay*1000 + MODEM_PREAMBLE_MS;
+      bits.forEach((b, i) => {
+        setTimeout(() => {
+          bitEls.forEach(el => el.classList.remove('active'));
+          bitEls[i].classList.add('active', b ? 'on' : 'off');
+        }, baseDelayMs + i*MODEM_BIT_MS);
+      });
+      setTimeout(() => { bitEls.forEach(el => el.classList.remove('active')); }, baseDelayMs + bits.length*MODEM_BIT_MS + 50);
+      log('音声モデム: ' + value + '（2進数 ' + bits.join('') + '）を送信');
+    }
   });
 
   // ---- 受信 ----
@@ -2616,6 +2716,27 @@
   let modemBitsCollected = [];
   const modemBitEls = [];
 
+  // ---- 高速モード（並列）用：8ビット分のメーターをまとめて生成 ----
+  const modemFastFillEls = { preamble:null, bits:[] };
+  function buildModemFastMeters(){
+    modemEnergyFast.innerHTML = '';
+    const rowPre = document.createElement('div');
+    rowPre.className = 'modem-energy-row';
+    rowPre.innerHTML = '<div class="modem-energy-label">同期音</div><div class="modem-energy-track"><div class="modem-energy-fill"></div></div>';
+    modemEnergyFast.appendChild(rowPre);
+    modemFastFillEls.preamble = rowPre.querySelector('.modem-energy-fill');
+
+    MODEM_PARALLEL_BIT_FREQS.forEach((freq, i) => {
+      const row = document.createElement('div');
+      row.className = 'modem-energy-row';
+      row.innerHTML = '<div class="modem-energy-label">b' + i + '（' + freq + 'Hz）</div><div class="modem-energy-track"><div class="modem-energy-fill"></div></div>';
+      modemEnergyFast.appendChild(row);
+      modemFastFillEls.bits.push(row.querySelector('.modem-energy-fill'));
+    });
+  }
+  buildModemFastMeters();
+  let modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
+
   function renderModemRxBits(){
     modemRxBits.innerHTML = '';
     modemBitEls.length = 0;
@@ -2631,9 +2752,14 @@
   function resetModemReceiveState(){
     modemState = 'idle';
     modemBitsCollected = [];
+    modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
     renderModemRxBits();
     modemReceivedVal.textContent = '受信待ち…';
     rxTextM.textContent = rxRunningM ? '待機中…（同期音を探しています）' : '未受信';
+    if(modemFastFillEls.preamble){
+      modemFastFillEls.preamble.style.width = '0%';
+      modemFastFillEls.bits.forEach(el => { el.style.width = '0%'; });
+    }
   }
   modemRxReset.addEventListener('click', () => { resetModemReceiveState(); log('音声モデム: 受信をリセット'); });
 
@@ -2672,6 +2798,10 @@
     rxBtnM.classList.remove('hidden');
     rxOffBtnM.classList.add('hidden');
     fillPreamble.style.width='0%'; fillBit0.style.width='0%'; fillBit1.style.width='0%';
+    if(modemFastFillEls.preamble){
+      modemFastFillEls.preamble.style.width = '0%';
+      modemFastFillEls.bits.forEach(el => { el.style.width = '0%'; });
+    }
   }
   rxBtnM.addEventListener('click', startModemRx);
   rxOffBtnM.addEventListener('click', stopModemRx);
@@ -2687,7 +2817,18 @@
     if(!rxRunningM || !analyserM) return;
     const data = new Uint8Array(analyserM.frequencyBinCount);
     analyserM.getByteFrequencyData(data);
+    const now = performance.now();
 
+    if(modemMode === 'fast'){
+      tickModemRxFast(data, now);
+    } else {
+      tickModemRxNormal(data, now);
+    }
+
+    requestAnimationFrame(tickModemRx);
+  }
+
+  function tickModemRxNormal(data, now){
     const preamblePeak = peakAtFreq(analyserM, data, MODEM_PREAMBLE_FREQ);
     const bit0Peak = peakAtFreq(analyserM, data, MODEM_BIT0_FREQ);
     const bit1Peak = peakAtFreq(analyserM, data, MODEM_BIT1_FREQ);
@@ -2695,8 +2836,6 @@
     fillPreamble.style.width = Math.min(100, (preamblePeak/255)*100) + '%';
     fillBit0.style.width = Math.min(100, (bit0Peak/255)*100) + '%';
     fillBit1.style.width = Math.min(100, (bit1Peak/255)*100) + '%';
-
-    const now = performance.now();
 
     if(modemState === 'idle'){
       if(preamblePeak >= MODEM_DETECT_THRESHOLD){
@@ -2742,8 +2881,46 @@
         }
       }
     }
+  }
 
-    requestAnimationFrame(tickModemRx);
+  // 高速モード：8ビット分のチャンネルを一度に測って、1回のコードで8ビット全部を判定する
+  function tickModemRxFast(data, now){
+    const preamblePeak = peakAtFreq(analyserM, data, MODEM_PARALLEL_PREAMBLE_FREQ);
+    modemFastFillEls.preamble.style.width = Math.min(100, (preamblePeak/255)*100) + '%';
+
+    const bitPeaks = MODEM_PARALLEL_BIT_FREQS.map(freq => peakAtFreq(analyserM, data, freq));
+    bitPeaks.forEach((p, i) => { modemFastFillEls.bits[i].style.width = Math.min(100, (p/255)*100) + '%'; });
+
+    if(modemState === 'idle'){
+      if(preamblePeak >= MODEM_DETECT_THRESHOLD){
+        modemState = 'receiving';
+        modemWinMaxParallel = new Array(MODEM_BITS).fill(0);
+        modemWindowStartTime = now + MODEM_PREAMBLE_MS;
+        rxTextM.textContent = '同期音を検出！8ビット同時受信中…';
+        log('音声モデム（高速）: 同期音を検出、受信開始');
+      }
+    } else if(modemState === 'receiving'){
+      if(now >= modemWindowStartTime){
+        bitPeaks.forEach((p, i) => { if(p > modemWinMaxParallel[i]) modemWinMaxParallel[i] = p; });
+
+        const windowEnd = modemWindowStartTime + MODEM_PARALLEL_CHORD_MS;
+        if(now >= windowEnd){
+          const bits = modemWinMaxParallel.map(p => p >= MODEM_PARALLEL_DETECT_THRESHOLD ? 1 : 0);
+          bits.forEach((b, i) => {
+            if(modemBitEls[i]){
+              modemBitEls[i].textContent = b;
+              modemBitEls[i].classList.add(b ? 'on' : 'off');
+            }
+          });
+          const value = parseInt(bits.join(''), 2);
+          modemReceivedVal.textContent = '受信した数値: ' + value + '（2進数 ' + bits.join('') + '）';
+          rxTextM.textContent = '受信完了！（高速モード）';
+          log('音声モデム（高速）: 受信完了 → ' + value + '（' + bits.join('') + '）');
+          showToast('受信成功', '値: ' + value + '（高速モード）');
+          modemState = 'idle';
+        }
+      }
+    }
   }
 })();
 </script>
